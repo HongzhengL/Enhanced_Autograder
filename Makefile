@@ -7,6 +7,7 @@ INCDIR=include
 LIBDIR=lib
 
 SOL_DIR=solutions
+PROJECT_NAME=project2
 
 SOURCE_FILE=$(SRCDIR)/template.c
 MQ_SRC_FILE=$(SRCDIR)/mq_template.c
@@ -61,5 +62,26 @@ clean:
 	rm -f solutions/sol_* solutions/mq_sol_*
 	rm -f $(LIBDIR)/*.o
 	rm -f input/*.in output/*
+	rm -f test_results/*
 
-.PHONY: auto clean exec redir pipe
+zip:
+	zip -r $(PROJECT_NAME).zip include lib src input output solutions expected Makefile README.md
+
+test-setup:
+	@chmod u+x testius
+	@chmod -R u+x test_cases/
+	@chmod -R u+x autograder
+	rm -rf test_results/*
+
+test_autograder: autograder test-setup
+	@./testius test_cases/tests.json -v
+
+test_mq_autograder: mq_autograder test-setup
+	@./testius test_cases/mq_tests.json -v
+
+kill:
+	@for number in $(shell seq 1 $(N)); do \
+		pgrep -f "sol_$$number" > /dev/null && (pkill -SIGKILL -f "sol_$$number" || echo "Could not kill sol_$$number") || true; \
+	done
+
+.PHONY: auto clean exec redir pipe zip test-setup test_autograder test_mq_autograder kill
