@@ -1,0 +1,13 @@
+{
+    "name": "CSCI 4061 Project 2",
+    "child_output_file": "results.txt",
+    "timeout": 180,
+    "tests": [
+        {
+            "name": "Change 2 - pipe",
+            "description": "pass the input parameter using a pipe between the autograder and each child",
+            "command": "./autograder test_cases/pipe 1 2 3",
+            "output_file": "test_cases/output/pipe_results.txt"
+        }
+    ]
+}

@@ -1,0 +1,37 @@
+{
+    "name": "CSCI 4061 Project 2",
+    "child_output_file": "results.txt",
+    "timeout": 180,
+    "tests": [
+        {
+            "name": "Single Functionality Test -- correct case",
+            "description": "Testing on the correct case",
+            "command": "./autograder test_cases/correct 1 2 3",
+            "output_file": "test_cases/output/correct_results.txt"
+        },
+        {
+            "name": "Single Functionality Test -- incorrect case",
+            "description": "Testing on the incorrect case",
+            "command": "./autograder test_cases/incorrect 1 2 3",
+            "output_file": "test_cases/output/incorrect_results.txt"
+        },
+        {
+            "name": "Single Functionality Test -- segfault case",
+            "description": "Testing on the segfault case",
+            "command": "./autograder test_cases/segfault 1 2 3",
+            "output_file": "test_cases/output/segfault_results.txt"
+        },
+        {
+            "name": "Single Functionality Test -- infinite loop case",
+            "description": "Testing on the infinite loop case",
+            "command": "./autograder test_cases/infinite 1 2 3",
+            "output_file": "test_cases/output/infinite_results.txt"
+        },
+        {
+            "name": "Single Functionality Test -- stuck or blocked case",
+            "description": "Testing on the stuck or blocked case",
+            "command": "./autograder test_cases/stuck 1 2 3",
+            "output_file": "test_cases/output/stuck_results.txt"
+        }
+    ]
+}

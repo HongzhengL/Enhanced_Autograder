@@ -1,0 +1,13 @@
+{
+    "name": "CSCI 4061 Project 2",
+    "child_output_file": "results.txt",
+    "timeout": 180,
+    "tests": [
+        {
+            "name": "Change 2 - redirect",
+            "description": "have the template read its parameter via STDIN",
+            "command": "./autograder test_cases/redir 1 2 3",
+            "output_file": "test_cases/output/redir_results.txt"
+        }
+    ]
+}
