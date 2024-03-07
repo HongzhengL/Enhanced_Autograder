@@ -94,7 +94,7 @@ test-redir: clean-tests redir test-setup
 test-pipe: clean-tests pipe test-setup
 	@./testius test_cases/pipe.json -v
 
-test-all: test_simple test_exec test_redir test_pipe
+test-all: test-simple test-exec test-redir test-pipe
 
 test-mq-autograder: mq_autograder test-setup
 	@./testius test_cases/mq_tests.json -v
