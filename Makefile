@@ -85,16 +85,19 @@ test-simple: clean-tests exec test-setup
 	@./testius test_cases/simple.json -v
 endif
 
-test-exec: clean-tests exec test-setup
+test-exec:
+	@make clean-tests exec test-setup
 	@./testius test_cases/exec.json -v
 
-test-redir: clean-tests redir test-setup
+test-redir:
+	@make clean-tests redir test-setup
 	@./testius test_cases/redir.json -v
 
-test-pipe: clean-tests pipe test-setup
+test-pipe:
+	@make clean-tests pipe test-setup
 	@./testius test_cases/pipe.json -v
 
-test-all: test-simple test-exec test-redir test-pipe
+test-all: test-exec test-redir test-pipe
 
 test-mq-autograder: mq_autograder test-setup
 	@./testius test_cases/mq_tests.json -v
