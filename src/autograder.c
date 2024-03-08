@@ -23,8 +23,13 @@ void timeout_handler(int signum) {
 // Execute the student's executable using exec()
 void execute_solution(char *executable_path, char *input, int batch_idx) {
     #ifdef PIPE
-        // TODO: Setup pipe
-
+        // TODO: Setup PIPE
+    int pipe_fd[2];
+    
+    if(pipe(pipe_fd) == -1){ // check pipe
+        perror("Pipe Failed");
+        exit(EXIT_FAILURE);
+    }
     #endif
     
     pid_t pid = fork();
@@ -32,9 +37,19 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
     // Child process
     if (pid == 0) {
         char *executable_name = get_exe_name(executable_path);
-
+            
         // TODO (Change 1): Redirect STDOUT to output/<executable>.<input> file
-
+        char output_path[64];
+        sprintf(output_path, "./output/%s.%d", executable_name, input);
+        int output_file  = open(output_path, O_CREAT | O_RDWR);
+        if(output_file == NULL){ // check if output_file was properly opened
+            perror("File Open Failed");
+            exit(EXIT_FAILURE);
+        }
+        if(dup2(output_file, 1) == -1){ // check dup2, setting stdout to redirect to output_file
+            fprintf(stderr, "Error on line %d: failed to dup2", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
 
         // TODO (Change 2): Handle different cases for input source
         #ifdef EXEC
@@ -112,31 +127,58 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
 }
 
 int get_batch_size(){
+    int nCore = 0;
+    int sz; //bytes_read
     int pipe_fd[2]; //create a pipe for outputs
 
-    pipe(pipe_fd);
+    if(pipe(pipe_fd) == -1){
+        perror("Pipe Failed");
+        exit(EXIT_FAILURE);
+    }
 
     pid_t grepproc = fork();
 
     if(grepproc == 0){ //child process
-        close(pipe_fd[0]); //Closing read end, won't need it.
-        dup2(pipe_fd[1], 1); //redirecting stdout to pipe
-        execl("/bin/grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
-        perror("Failed to run Process");
-        exit(1);
+
+        if(close(pipe_fd[0]) == -1){ //Closing read end, won't need it.
+            perror("Close Failed");
+            exit(EXIT_FAILURE);
+        }
+
+        if(dup2(pipe_fd[1], 1) == -1){//redirecting stdout to pipe
+            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);               
+        }
+
+        execlp("/bin/grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
+        fprintf(stderr, "Error occured at line %d: Failed to run Process",__LINE__ - 1);
+        exit(EXIT_FAILURE);
     }else if(grepproc > 0){ //Parent process
-        close(pipe_fd[1]); // close off write
-        dup2(pipe_fd[0], 0); //redirect stdin to pipe.    
-        int sz;
-        char batch_size[32];
-        sz = read(0, batch_size, 10);
-        batch_size[sz] = '\0'; // adding string term character to end of batch_size;
-        close(pipe_fd[0]);
+        
+        if(close(pipe_fd[1]) == -1){ // close off write
+            perror("Close Failed");
+            exit(EXIT_FAILURE);
+        }
+        if(dup2(pipe_fd[0], 0) == -1){ //redirect stdin to pipe.
+            perror("dup2 failed");
+            exit(EXIT_FAILURE);
+        }
+        char reader[32];
+        if((sz = read(pipe_fd[0], reader, 10)) == -1){ //read from pipe
+            perror("read failed");
+            exit(EXIT_FAILURE);
+        }
+        reader[sz] = '\0'; // adding string term character to end of batch_size;
+        if(close(pipe_fd[0]) == -1){ //closing read end of pipe.
+            perror("close failed");
+            exit(EXIT_FAILURE);
+        }
         wait(NULL);
-        return atoi(batch_size);
+        nCore = atoi(reader);
+        return nCore;
     }else{
         perror("fork failed");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 }
 
