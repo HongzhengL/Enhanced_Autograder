@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "utils.c"
 
 // Batch size is determined at runtime now
 pid_t *pids;
@@ -126,61 +126,6 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
     free(child_status);
 }
 
-int get_batch_size(){
-    int nCore = 0;
-    int sz; //bytes_read
-    int pipe_fd[2]; //create a pipe for outputs
-
-    if(pipe(pipe_fd) == -1){
-        perror("Pipe Failed");
-        exit(EXIT_FAILURE);
-    }
-
-    pid_t grepproc = fork();
-
-    if(grepproc == 0){ //child process
-
-        if(close(pipe_fd[0]) == -1){ //Closing read end, won't need it.
-            perror("Close Failed");
-            exit(EXIT_FAILURE);
-        }
-
-        if(dup2(pipe_fd[1], 1) == -1){//redirecting stdout to pipe
-            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
-            exit(EXIT_FAILURE);               
-        }
-
-        execlp("/bin/grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
-        fprintf(stderr, "Error occured at line %d: Failed to run Process",__LINE__ - 1);
-        exit(EXIT_FAILURE);
-    }else if(grepproc > 0){ //Parent process
-        
-        if(close(pipe_fd[1]) == -1){ // close off write
-            perror("Close Failed");
-            exit(EXIT_FAILURE);
-        }
-        if(dup2(pipe_fd[0], 0) == -1){ //redirect stdin to pipe.
-            perror("dup2 failed");
-            exit(EXIT_FAILURE);
-        }
-        char reader[32];
-        if((sz = read(pipe_fd[0], reader, 10)) == -1){ //read from pipe
-            perror("read failed");
-            exit(EXIT_FAILURE);
-        }
-        reader[sz] = '\0'; // adding string term character to end of batch_size;
-        if(close(pipe_fd[0]) == -1){ //closing read end of pipe.
-            perror("close failed");
-            exit(EXIT_FAILURE);
-        }
-        wait(NULL);
-        nCore = atoi(reader);
-        return nCore;
-    }else{
-        perror("fork failed");
-        exit(EXIT_FAILURE);
-    }
-}
 
 
 int main(int argc, char *argv[]) {
