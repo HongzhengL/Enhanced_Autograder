@@ -481,8 +481,12 @@ class TestCase:
         ################### Modification ###################
         if self.child_output_file is not None:
             _, outcome = self.execute_result
-            with open(self.child_output_file, "r") as f:
-                actual_output = f.read()
+            try:
+                with open(self.child_output_file, "r") as f:
+                    actual_output = f.read()
+            except FileNotFoundError:
+                print(f"testius error: Output file '{self.child_output_file}' not found")
+                exit(1)
         else:
             actual_output, outcome = self.execute_result
 
