@@ -1,5 +1,11 @@
 #! /usr/bin/env python3
 
+# This file includes code derived from
+# Prof. Kolb's testius utility under the
+# GNU General Public License Version 3 (GPLv3). 
+# For more details, see the LICENSE file in the 
+# root directory of this project or <http://www.gnu.org/licenses/>.
+
 # Author: John Kolb <jhkolb@umn.edu>
 # Inspired by Chris Kauffman's original 'testy' utility
 # SPDX-License-Identifier: GPL-3.0-or-later
