@@ -107,7 +107,7 @@ Example inputs:
 Example output:
     0.5
 */
-double get_score(char *results_file, char *executable_name);
+double get_score(char *results_file);
 
 
 /*

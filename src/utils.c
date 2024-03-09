@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#define ALIGNMENT 9     // Number of characters to align the status messages
 
 const char* get_status_message(int status) {
     switch (status) {
@@ -87,24 +88,99 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
 // TODO: Implement this function
 int get_batch_size() {
-    return 8;
+    int nCore = 0;
+    int bytes_read;
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        fprintf(stderr, "Error occurred at line %d: pipe failed\n", __LINE__ - 1);
+        exit(EXIT_FAILURE);
+    }
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (close(pipefd[0]) == -1) {
+            fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            fprintf(stderr, "Error occurred at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        execlp("grep", "grep", "processor", "/proc/cpuinfo", NULL);
+        fprintf(stderr, "Error occurred at line %d: execlp failed\n", __LINE__ - 1);
+        exit(EXIT_FAILURE);
+    } else if (pid > 0) {
+        if (close(pipefd[1]) == -1) {
+            perror("close");
+            exit(EXIT_FAILURE);
+        }
+        char buffer[BUFSIZ];
+        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
+            for (int i = 0; i < bytes_read; i++) {
+                if (buffer[i] == '\n') {
+                    nCore++;
+                }
+            }
+        }
+        if (bytes_read == -1) {
+            perror("read");
+            exit(EXIT_FAILURE);
+        }
+        wait(NULL); // Wait for child process to finish and prevent zombie process
+    } else {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    return nCore;
 }
 
 
 // TODO: Implement this function
 void create_input_files(char **argv_params, int num_parameters) {
-
+    for (int i = 0; i < num_parameters; ++i) {
+        char *input_file = malloc(strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1);  // +1 for the null terminator
+        sprintf(input_file, "input/%s.in", argv_params[i]);
+        FILE *file = fopen(input_file, "w");
+        if (!file) {
+            perror("Failed to open file");
+            exit(EXIT_FAILURE);
+        }
+        fprintf(file, "%s", argv_params[i]);
+        fclose(file);
+        free(input_file);
+    }
 }
 
 // TODO: Implement this function
 void remove_input_files(char **argv_params, int num_parameters) {
-
+    for (int i = 0; i < num_parameters; ++i) {
+        char *input_file = malloc(strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1);  // +1 for the null terminator
+        sprintf(input_file, "input/%s.in", argv_params[i]);
+        if (unlink(input_file) == -1) {
+            perror("Failed to unlink file");
+            free(input_file);
+            exit(EXIT_FAILURE);
+        }
+        free(input_file);
+    }
 }
 
 
 // TODO: Implement this function
 void remove_output_files(autograder_results_t *results, int tested, int current_batch_size, char *param) {
+    for (int i = 0; i < current_batch_size; ++i) {
+        char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
+        char *output_file = malloc(strlen("output/") + strlen(exe_name) + strlen(param) + 2);
+        sprintf(output_file, "output/%s.%s", exe_name, param);
 
+        /*********** Uncomment before Submission *************/
+        if (unlink(output_file) == -1) {
+            perror("Failed to unlink file");
+            free(output_file);
+            exit(EXIT_FAILURE);
+        }
+
+        free(output_file);
+    } 
 }
 
 
@@ -173,14 +249,34 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
 
 
 // TODO: Implement this function
-double get_score(char *results_file, char *executable_name) {
-    return 1.0;
+double get_score(char *result_line) {
+    int correct = 0;
+    int total = 0;
+    char *token = strstr(result_line, "(");
+    while (token != NULL) {
+        char result[ALIGNMENT + 1];     // +1 for the null terminator
+        strncpy(result, token + 1, ALIGNMENT);
+        result[9] = '\0';
+        if (strcmp(result, "  correct") == 0) {
+            ++correct;
+        }
+        ++total;
+        token = strstr(token + 1, "(");
+    }
+    printf("%d %d\n", correct, total);
+    return (double) correct / total * 1.0;
 }
 
 
 void write_scores_to_file(autograder_results_t *results, int num_executables, char *results_file) {
+    FILE *file = fopen(results_file, "r");
     for (int i = 0; i < num_executables; i++) {
-        double student_score = get_score(results_file, results[i].exe_path);
+
+        char *line = NULL;
+        size_t len = 0;
+        getline(&line, &len, file);
+        double student_score = get_score(line);
+
         char *student_exe = get_exe_name(results[i].exe_path);
 
         char score_file[] = "scores.txt";
