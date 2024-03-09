@@ -88,49 +88,51 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
 // TODO: Implement this function
 int get_batch_size() {
-    int nCore = 0;
-    int bytes_read;
-    int pipefd[2];
-    if (pipe(pipefd) == -1) {
+    int batch_size = 0;
+    int bytes_read; // bytes_read
+    int pipe_fd[2]; // create a pipe for outputs
+
+    if(pipe(pipe_fd) == -1){
         fprintf(stderr, "Error occurred at line %d: pipe failed\n", __LINE__ - 1);
         exit(EXIT_FAILURE);
     }
+
     pid_t pid = fork();
-    if (pid == 0) {
-        if (close(pipefd[0]) == -1) {
+
+    if (pid == 0) { // child process
+        if (close(pipe_fd[0]) == -1) { // Closing read end, won't need it.
             fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
-            fprintf(stderr, "Error occurred at line %d: dup2 failed\n", __LINE__ - 1);
+        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) { //redirecting stdout to pipe
+            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
-        execlp("grep", "grep", "processor", "/proc/cpuinfo", NULL);
-        fprintf(stderr, "Error occurred at line %d: execlp failed\n", __LINE__ - 1);
+        execlp("grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
+        fprintf(stderr, "Error occured at line %d: Failed to run execlp",__LINE__ - 1);
         exit(EXIT_FAILURE);
-    } else if (pid > 0) {
-        if (close(pipefd[1]) == -1) {
-            perror("close");
+    } else if(pid > 0) { // Parent process
+        if (close(pipe_fd[1]) == -1) { // close off write
+            perror("Close Failed");
             exit(EXIT_FAILURE);
         }
-        char buffer[BUFSIZ];
-        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
-            for (int i = 0; i < bytes_read; i++) {
-                if (buffer[i] == '\n') {
-                    nCore++;
-                }
-            }
-        }
-        if (bytes_read == -1) {
-            perror("read");
+        char reader[BUFSIZ];
+        if ((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1) { // read from pipe
+            perror("read failed");
             exit(EXIT_FAILURE);
         }
-        wait(NULL); // Wait for child process to finish and prevent zombie process
+        reader[bytes_read] = '\0'; // adding string term character to end of batch_size;
+        if (close(pipe_fd[0]) == -1) { // closing read end of pipe.
+            perror("close failed");
+            exit(EXIT_FAILURE);
+        }
+        wait(NULL);
+        batch_size = atoi(reader);
     } else {
-        perror("fork");
+        perror("fork failed");
         exit(EXIT_FAILURE);
     }
-    return nCore;
+    return batch_size;
 }
 
 

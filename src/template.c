@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     pid_t pid = getpid(); 
 
     sleep(1); 
-
+    
     switch (mode) {
         case 1:
             // Using fprintf(stderr, ...) since STDOUT is redirected to a file
@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
             // TODO: Write the result (0) to the output file (output/<executable>.<input>)
             //       Do not open the file. Think about what function you can use to output
             //       information given what you redirected in the autograder.c file.
+
             printf("0");
             break;
         case 2:

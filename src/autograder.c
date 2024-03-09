@@ -23,6 +23,7 @@ void timeout_handler(int signum) {
 // Execute the student's executable using exec()
 void execute_solution(char *executable_path, char *input, int batch_idx) {
     #ifdef PIPE
+
         // TODO: Setup pipe
         int pipefd[2];
         if (pipe(pipefd) == -1) {
@@ -37,8 +38,9 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
     // Child process
     if (pid == 0) {
         char *executable_name = get_exe_name(executable_path);
-
+            
         // TODO (Change 1): Redirect STDOUT to output/<executable>.<input> file
+
         char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(input) + 2);    // +2 for the null terminator and the dot
         sprintf(output_path, "output/%s.%s", executable_name, input);
         // printf("output_path: %s\n", output_path);
@@ -53,7 +55,7 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
             exit(EXIT_FAILURE);
         }
         free(output_path);
-
+      
         // TODO (Change 2): Handle different cases for input source
         #ifdef EXEC
             execl(executable_path, executable_name, input, NULL);
