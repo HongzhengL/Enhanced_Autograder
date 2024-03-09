@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/types.h>
 
 
 
@@ -30,13 +31,16 @@ int main(int argc, char *argv[]) {
 
     // TODO: Get input param from the different sources
     #ifdef EXEC
-        
+        param = atoi(argv[1]);
 
     #elif REDIR
-       
+        scanf("%u", &param);
         
     #elif PIPE
-        
+        int pipefd = atoi(argv[1]);
+        char buffer[BUFSIZ];
+        read(pipefd, buffer, BUFSIZ);
+        param = atoi(buffer);
 
     #endif
 
@@ -55,12 +59,12 @@ int main(int argc, char *argv[]) {
             // TODO: Write the result (0) to the output file (output/<executable>.<input>)
             //       Do not open the file. Think about what function you can use to output
             //       information given what you redirected in the autograder.c file.
-
+            printf("0");
             break;
         case 2:
             fprintf(stderr, "Program: %s, PID: %d, Mode: 2 - Exiting with status 1 (Incorrect answer)\n", argv[0], pid);
             // TODO: Write the result (1) to the output file (same as case 1 above)
-            
+            printf("1");
             break;
         case 3:
             fprintf(stderr, "Program: %s, PID: %d, Mode: 3 - Triggering a segmentation fault\n", argv[0], pid);
