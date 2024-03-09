@@ -1,3 +1,7 @@
 test_results
 .vscode
 *.sh
+*.o
+solutions
+autograder
+.DS_Store
