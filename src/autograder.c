@@ -237,6 +237,8 @@ int main(int argc, char *argv[]) {
 
             // Adjust the remaining count after the batch has finished
             remaining -= curr_batch_size;
+
+            free(pids);
         }
     }
 
@@ -263,7 +265,5 @@ int main(int argc, char *argv[]) {
     free(results);
     free(executable_paths);
 
-    free(pids);
-    
     return 0;
 }     
