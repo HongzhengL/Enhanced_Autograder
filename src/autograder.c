@@ -1,4 +1,4 @@
-#include "utils.c"
+#include "utils.h"
 
 // Batch size is determined at runtime now
 pid_t *pids;
