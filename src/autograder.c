@@ -16,7 +16,15 @@ int *child_status;
 
 // TODO: Timeout handler for alarm signal
 void timeout_handler(int signum) {
-
+    for (int j = 0; j < curr_batch_size; j++) { 
+        if (child_status[j] == 1) { //Checks if child is still running
+            if (kill(pids[j], SIGKILL) == 1) { //does check on kill signal to see if successful
+                perror("Kill Failed");
+                exit(EXIT_FAILURE);
+            }
+            child_status[j] = -1; // sets recently killed child's status to -1
+        }
+    }
 }
 
 
@@ -42,9 +50,9 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
 
         char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(input) + 2);    // +2 for the null terminator and the dot
         sprintf(output_path, "output/%s.%s", executable_name, input);
-        // printf("output_path: %s\n", output_path);
+        printf("output_path: %s\n", output_path);
         int fd;
-        if ((fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1) {
+        if ((fd = open(output_path, O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1) {
             free(output_path);
             fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
             exit(EXIT_FAILURE);
@@ -160,15 +168,51 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
 
         int status;
         pid_t pid = waitpid(pids[j], &status, 0);
+        if(errno = EINTR){
+            pid = waitpid(pids[j], &status, 0);
+        }
 
         // TODO: Determine if the child process finished normally, segfaulted, or timed out
         int exit_status = WEXITSTATUS(status);
+        printf("exit_status = %d, status = %d\n", exit_status, status);
         int exited = WIFEXITED(status);
         int signaled = WIFSIGNALED(status);
-        
+        int final_status;
+        if (signaled) {
+            if (WTERMSIG(status) == SIGSEGV) {
+                final_status = SEGFAULT;
+            } else { 
+                final_status = STUCK_OR_INFINITE;
+            }
+        }else if (exited) {
+            char *executable_name = get_exe_name(results[tested - curr_batch_size + j].exe_path);
+            char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(param) + 2);    // +2 for the null terminator and the dot
+            sprintf(output_path, "output/%s.%s", executable_name, param);
+            printf("output_path: %s\n", output_path);
+            int fd;
+            if ((fd = open(output_path, O_RDONLY, 0644)) == -1) {
+                free(output_path);
+                fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
+                exit(EXIT_FAILURE);
+            }
+            free(output_path);
+            int bytes_read;
+            char output[2]; // set to 2 since 1 will be output and the other character will be '\0'.
+            if ((bytes_read = read(fd, output, 2)) == -1){
+                perror("Read Failed");
+                exit(EXIT_FAILURE);
+            }
+            printf("%s\n",output);
+            if (atoi(output) == 0) {
+                final_status = CORRECT;
+            } else {
+                final_status = INCORRECT;
+            }
+            close(fd);
+        }
         
         // TODO: Also, update the results struct with the status of the child process
-
+        results[tested - curr_batch_size + j].status[param_idx] = final_status;
 
         // Adding tested parameter to results struct
         results[tested - curr_batch_size + j].params_tested[param_idx] = atoi(param);
@@ -178,7 +222,16 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
     }
 
     // TODO: Cancel the timer
+    struct itimerval interval;
+    interval.it_interval.tv_sec = 0;
+    interval.it_interval.tv_usec = 0;
+    interval.it_value.tv_sec = 0; // Stopping Timer.
+    interval.it_value.tv_usec = 0;
 
+    if (setitimer(ITIMER_REAL, &interval, 0)) {
+        perror("setitimer");
+        exit(EXIT_FAILURE);
+    }
 
     free(child_status);
 }
