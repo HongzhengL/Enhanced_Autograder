@@ -39,7 +39,20 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
         char *executable_name = get_exe_name(executable_path);
 
         // TODO (Change 1): Redirect STDOUT to output/<executable>.<input> file
-
+        char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(input) + 2);    // +2 for the null terminator and the dot
+        sprintf(output_path, "output/%s.%s", executable_name, input);
+        // printf("output_path: %s\n", output_path);
+        int fd;
+        if ((fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1) {
+            free(output_path);
+            fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(fd, STDOUT_FILENO) == -1) {
+            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        free(output_path);
 
         // TODO (Change 2): Handle different cases for input source
         #ifdef EXEC
