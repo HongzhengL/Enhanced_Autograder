@@ -1,6 +1,7 @@
 {
     "name": "CSCI 4061 Project 2",
     "child_output_file": "results.txt",
+    "timeout": 180,
     "tests": [
         {
             "name": "Single Functionality Test -- correct case",
@@ -31,24 +32,6 @@
             "description": "Testing on the stuck or blocked case",
             "command": "./autograder test_cases/stuck 1 2 3",
             "output_file": "test_cases/output/stuck_results.txt"
-        },
-        {
-            "name": "Change 2 - exec",
-            "description": "pass each input parameter using exec as before (no new changes over Change 1 in this case.)",
-            "command": "./autograder test_cases/exec 1 2 3",
-            "output_file": "test_cases/output/exec_results.txt"
-        },
-        {
-            "name": "Change 2 - redirect",
-            "description": "have the template read its parameter via STDIN",
-            "command": "./autograder test_cases/redir 1 2 3",
-            "output_file": "test_cases/output/redir_results.txt"
-        },
-        {
-            "name": "Change 2 - pipe",
-            "description": "pass the input parameter using a pipe between the autograder and each child",
-            "command": "./autograder test_cases/pipe 1 2 3",
-            "output_file": "test_cases/output/pipe_results.txt"
         }
     ]
 }

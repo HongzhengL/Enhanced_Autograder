@@ -1,0 +1,14 @@
+This file is part of Enhanced_Autograder and is licensed under the GNU General Public License Version 3.
+
+Enhanced_Autograder is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Enhanced_Autograder is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Enhanced_Autograder. If not, see <http://www.gnu.org/licenses/>.

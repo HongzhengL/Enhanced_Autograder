@@ -1,5 +1,11 @@
 #! /usr/bin/env python3
 
+# This file includes code derived from
+# Prof. Kolb's testius utility under the
+# GNU General Public License Version 3 (GPLv3). 
+# For more details, see the LICENSE file in the 
+# root directory of this project or <http://www.gnu.org/licenses/>.
+
 # Author: John Kolb <jhkolb@umn.edu>
 # Inspired by Chris Kauffman's original 'testy' utility
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -475,8 +481,12 @@ class TestCase:
         ################### Modification ###################
         if self.child_output_file is not None:
             _, outcome = self.execute_result
-            with open(self.child_output_file, "r") as f:
-                actual_output = f.read()
+            try:
+                with open(self.child_output_file, "r") as f:
+                    actual_output = f.read()
+            except FileNotFoundError:
+                print(f"testius error: Output file '{self.child_output_file}' not found")
+                exit(1)
         else:
             actual_output, outcome = self.execute_result
 
