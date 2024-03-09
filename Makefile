@@ -7,6 +7,7 @@ INCDIR=include
 LIBDIR=lib
 
 SOL_DIR=solutions
+PROJECT_NAME=project2
 
 SOURCE_FILE=$(SRCDIR)/template.c
 MQ_SRC_FILE=$(SRCDIR)/mq_template.c
@@ -61,5 +62,51 @@ clean:
 	rm -f solutions/sol_* solutions/mq_sol_*
 	rm -f $(LIBDIR)/*.o
 	rm -f input/*.in output/*
+	rm -rf test_results
 
-.PHONY: auto clean exec redir pipe
+zip: clean
+	zip -r $(PROJECT_NAME).zip include lib src input output solutions expected Makefile README.md
+
+test-setup:
+	@chmod u+x testius
+	@chmod -R u+x test_cases/
+	@chmod -R u+x autograder
+	rm -rf test_results/*
+
+clean-tests:
+	rm -rf autograder test_results
+
+ifdef testnum
+test-simple: clean-tests exec test-setup
+	@rm -f results.txt
+	@./testius test_cases/simple.json -v -n "$(testnum)"
+else
+test-simple: clean-tests exec test-setup
+	@./testius test_cases/simple.json -v
+endif
+
+test-exec:
+	@make clean-tests exec test-setup
+	@./testius test_cases/exec.json -v
+
+test-redir:
+	@make clean-tests redir test-setup
+	@./testius test_cases/redir.json -v
+
+test-pipe:
+	@make clean-tests pipe test-setup
+	@./testius test_cases/pipe.json -v
+
+test-all: test-exec test-redir test-pipe
+
+test-mq-autograder: mq_autograder test-setup
+	@./testius test_cases/mq_tests.json -v
+
+.NOTPARALLEL: exec redir pipe test-setup
+
+kill:
+	@for number in $(shell seq 1 $(N)); do \
+		pgrep -f "sol_$$number" > /dev/null && (pkill -SIGKILL -f "sol_$$number" || echo "Could not kill sol_$$number") || true; \
+	done
+
+.PHONY: auto clean exec redir pipe zip test-setup test-simple test-mq-autograder kill test-exec test-redir test-pipe test-all clean-tests

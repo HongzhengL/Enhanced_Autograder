@@ -23,13 +23,14 @@ void timeout_handler(int signum) {
 // Execute the student's executable using exec()
 void execute_solution(char *executable_path, char *input, int batch_idx) {
     #ifdef PIPE
-        // TODO: Setup PIPE
-    int pipe_fd[2];
-    
-    if(pipe(pipe_fd) == -1){ // check pipe
-        perror("Pipe Failed");
-        exit(EXIT_FAILURE);
-    }
+
+        // TODO: Setup pipe
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+            fprintf(stderr, "Error occured at line %d: pipe failed", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        printf("Pipe created: %d, %d\n", pipefd[0], pipefd[1]);
     #endif
     
     pid_t pid = fork();
@@ -39,31 +40,58 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
         char *executable_name = get_exe_name(executable_path);
             
         // TODO (Change 1): Redirect STDOUT to output/<executable>.<input> file
-        char output_path[64];
-        sprintf(output_path, "./output/%s.%d", executable_name, input);
-        int output_file  = open(output_path, O_CREAT | O_RDWR);
-        if(output_file == NULL){ // check if output_file was properly opened
-            perror("File Open Failed");
-            exit(EXIT_FAILURE);
-        }
-        if(dup2(output_file, 1) == -1){ // check dup2, setting stdout to redirect to output_file
-            fprintf(stderr, "Error on line %d: failed to dup2", __LINE__ - 1);
-            exit(EXIT_FAILURE);
-        }
 
+        char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(input) + 2);    // +2 for the null terminator and the dot
+        sprintf(output_path, "output/%s.%s", executable_name, input);
+        // printf("output_path: %s\n", output_path);
+        int fd;
+        if ((fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1) {
+            free(output_path);
+            fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(fd, STDOUT_FILENO) == -1) {
+            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        free(output_path);
+      
         // TODO (Change 2): Handle different cases for input source
         #ifdef EXEC
-
+            execl(executable_path, executable_name, input, NULL);
 
         #elif REDIR
             
             // TODO: Redirect STDIN to input/<input>.in file
-            
+            char *input_path = malloc(strlen("input/") + strlen(input) + strlen(".in") + 1);    // +1 for the null terminator
+            sprintf(input_path, "input/%s.in", input);
+
+            int child_fd = open(input_path, O_RDONLY);
+            free(input_path);
+            if (child_fd == -1) {
+                fprintf(stderr, "Error occured at line %d: open failed", __LINE__ - 3);
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(child_fd, STDIN_FILENO) == -1) {
+                fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            execl(executable_path, executable_name, NULL);
 
         #elif PIPE
-            
-            // TODO: Pass read end of pipe to child process
 
+            // TODO: Pass read end of pipe to child process
+            if (close(pipefd[1]) == -1) {
+                fprintf(stderr, "Error occured at line %d: close failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+                fprintf(stderr, "Error occured at line %d: dup2 failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            char string_of_pipefd[MAX_INT_CHARS + 1];
+            sprintf(string_of_pipefd, "%d", pipefd[0]);
+            execl(executable_path, executable_name, string_of_pipefd, NULL);
         #endif
 
         // If exec fails
@@ -74,11 +102,38 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
     else if (pid > 0) {
         #ifdef PIPE
             // TODO: Send input to child process via pipe
-            
+            if (close(pipefd[0]) == -1) {
+                fprintf(stderr, "Error occured at line %d: close failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            if (write(pipefd[1], input, strlen(input)) == -1) {
+                fprintf(stderr, "Error occured at line %d: write failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            close(pipefd[1]);
         #endif
 
         // TODO (Change 3): Setup timer to determine if child process is stuck
-        
+        struct sigaction sa;
+        struct itimerval interval;
+
+        sa.sa_handler = timeout_handler;
+        sa.sa_flags = 0;
+        sigemptyset(&sa.sa_mask);
+        if (sigaction(SIGALRM, &sa, NULL) == -1) {
+            perror("Failed to set up signal handler");
+            exit(1);
+        }
+
+        interval.it_interval.tv_sec = 0;
+        interval.it_interval.tv_usec = 0;
+        interval.it_value.tv_sec = TIMEOUT_SECS;
+        interval.it_value.tv_usec = 0;
+
+        if (setitimer(ITIMER_REAL, &interval, NULL) == -1) {
+            perror("Failed to set up timer");
+            exit(1);
+        } 
 
         pids[batch_idx] = pid;
     }
