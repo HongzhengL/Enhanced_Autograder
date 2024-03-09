@@ -20,7 +20,7 @@
 
 
 #define TIMEOUT_SECS 10    // Timeout threshold for stuck/infinite loop
-
+#define MAX_INT_CHARS 10 // Maximum number of characters in an integer
 // Main struct for storing the results of the autograder
 typedef struct {
     char *exe_path;       // path to executable

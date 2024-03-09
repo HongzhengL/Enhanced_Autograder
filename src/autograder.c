@@ -22,7 +22,6 @@ void timeout_handler(int signum) {
                 perror("Kill Failed");
                 exit(EXIT_FAILURE);
             }
-            child_status[j] = -1; // sets recently killed child's status to -1
         }
     }
 }
@@ -167,9 +166,8 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
     for (int j = 0; j < curr_batch_size; j++) {
 
         int status;
-        pid_t pid = waitpid(pids[j], &status, 0);
-        if(errno = EINTR){
-            pid = waitpid(pids[j], &status, 0);
+        while (waitpid(pids[j], &status, 0) && errno == EINTR){
+            errno = 0;
         }
 
         // TODO: Determine if the child process finished normally, segfaulted, or timed out
@@ -188,21 +186,21 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
             char *executable_name = get_exe_name(results[tested - curr_batch_size + j].exe_path);
             char *output_path = malloc(strlen("output/") + strlen(executable_name) + strlen(param) + 2);    // +2 for the null terminator and the dot
             sprintf(output_path, "output/%s.%s", executable_name, param);
-            printf("output_path: %s\n", output_path);
+            // printf("output_path: %s\n", output_path);
             int fd;
-            if ((fd = open(output_path, O_RDONLY, 0644)) == -1) {
+            if ((fd = open(output_path, O_RDONLY)) == -1) {
                 free(output_path);
                 fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
                 exit(EXIT_FAILURE);
             }
             free(output_path);
             int bytes_read;
-            char output[2]; // set to 2 since 1 will be output and the other character will be '\0'.
-            if ((bytes_read = read(fd, output, 2)) == -1){
+            char output[MAX_INT_CHARS]; // set to 2 since 1 will be output and the other character will be '\0'.
+            if ((bytes_read = read(fd, output, MAX_INT_CHARS)) == -1){
                 perror("Read Failed");
                 exit(EXIT_FAILURE);
             }
-            printf("%s\n",output);
+            output[bytes_read] = '\0';
             if (atoi(output) == 0) {
                 final_status = CORRECT;
             } else {
