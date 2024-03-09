@@ -1,4 +1,4 @@
-#include "../include/utils.h"
+#include "utils.h"
 
 #define ALIGNMENT 9     // Number of characters to align the status messages
 
@@ -87,10 +87,10 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
 
 // TODO: Implement this function
-int get_batch_size(){
-    int nCore = 0;
-    int bytes_read; //bytes_read
-    int pipe_fd[2]; //create a pipe for outputs
+int get_batch_size() {
+    int batch_size = 0;
+    int bytes_read; // bytes_read
+    int pipe_fd[2]; // create a pipe for outputs
 
     if(pipe(pipe_fd) == -1){
         fprintf(stderr, "Error occurred at line %d: pipe failed\n", __LINE__ - 1);
@@ -99,40 +99,40 @@ int get_batch_size(){
 
     pid_t pid = fork();
 
-    if(pid == 0){ //child process
-        if(close(pipe_fd[0]) == -1){ //Closing read end, won't need it.
+    if (pid == 0) { // child process
+        if (close(pipe_fd[0]) == -1) { // Closing read end, won't need it.
             fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
-        if(dup2(pipe_fd[1], STDOUT_FILENO) == -1){//redirecting stdout to pipe
+        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) { //redirecting stdout to pipe
             fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
-            exit(EXIT_FAILURE);               
+            exit(EXIT_FAILURE);
         }
-        execlp("/bin/grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
+        execlp("grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
         fprintf(stderr, "Error occured at line %d: Failed to run execlp",__LINE__ - 1);
         exit(EXIT_FAILURE);
-    }else if(pid > 0){ //Parent process
-        if(close(pipe_fd[1]) == -1){ // close off write
+    } else if(pid > 0) { // Parent process
+        if (close(pipe_fd[1]) == -1) { // close off write
             perror("Close Failed");
             exit(EXIT_FAILURE);
         }
         char reader[BUFSIZ];
-        if((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1){ //read from pipe
+        if ((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1) { // read from pipe
             perror("read failed");
             exit(EXIT_FAILURE);
         }
         reader[bytes_read] = '\0'; // adding string term character to end of batch_size;
-        if(close(pipe_fd[0]) == -1){ //closing read end of pipe.
+        if (close(pipe_fd[0]) == -1) { // closing read end of pipe.
             perror("close failed");
             exit(EXIT_FAILURE);
         }
         wait(NULL);
-        nCore = atoi(reader);
-        return nCore;
-    }else{
+        batch_size = atoi(reader);
+    } else {
         perror("fork failed");
         exit(EXIT_FAILURE);
     }
+    return batch_size;
 }
 
 
