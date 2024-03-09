@@ -30,7 +30,6 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
             fprintf(stderr, "Error occured at line %d: pipe failed", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
-        printf("Pipe created: %d, %d\n", pipefd[0], pipefd[1]);
     #endif
     
     pid_t pid = fork();
@@ -110,7 +109,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
                 fprintf(stderr, "Error occured at line %d: write failed", __LINE__ - 1);
                 exit(EXIT_FAILURE);
             }
-            close(pipefd[1]);
+            if (close(pipefd[1]) == -1) {
+                fprintf(stderr, "Error occured at line %d: close failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
         #endif
 
         // TODO (Change 3): Setup timer to determine if child process is stuck
