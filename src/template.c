@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     pid_t pid = getpid(); 
 
     sleep(1); 
-    mode = 1; // for debug case, don't want to deal with the other cases for now  
+    
     switch (mode) {
         case 1:
             // Using fprintf(stderr, ...) since STDOUT is redirected to a file
