@@ -44,13 +44,12 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
     while ((entry = readdir(dir)) != NULL) {
         // Ignore hidden files
         char path[PATH_MAX];
-        sprintf(path, "%s/%s", solution_dir, entry->d_name);
-        
+        snprintf(path, sizeof(path), "%s/%s", solution_dir, entry->d_name);
+
         if (stat(path, &st) == 0) {
             if (S_ISREG(st.st_mode) && entry->d_name[0] != '.')
                 (*num_executables)++;
-        } 
-        else {
+        } else {
             perror("Failed to get file status");
             exit(EXIT_FAILURE);
         }
@@ -67,12 +66,13 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
     while ((entry = readdir(dir)) != NULL) {
         // Ignore hidden files
         char path[PATH_MAX];
-        sprintf(path, "%s/%s", solution_dir, entry->d_name);
+        snprintf(path, sizeof(path), "%s/%s", solution_dir, entry->d_name);
 
         if (stat(path, &st) == 0) {
             if (S_ISREG(st.st_mode) && entry->d_name[0] != '.') {
-                executables[i] = (char *) malloc((strlen(solution_dir) + strlen(entry->d_name) + 2) * sizeof(char));
-                sprintf(executables[i], "%s/%s", solution_dir, entry->d_name);
+                int len_executable = strlen(solution_dir) + strlen(entry->d_name) + 2;
+                executables[i] = (char *) malloc((len_executable) * sizeof(char));
+                snprintf(executables[i], len_executable, "%s/%s", solution_dir, entry->d_name);
                 i++;
             }
         }
@@ -89,44 +89,53 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 // TODO: Implement this function
 int get_batch_size() {
     int batch_size = 0;
-    int bytes_read; // bytes_read
-    int pipe_fd[2]; // create a pipe for outputs
+    int bytes_read;  // bytes_read
+    int pipe_fd[2];  // create a pipe for outputs
 
-    if(pipe(pipe_fd) == -1){
+    if (pipe(pipe_fd) == -1) {
         fprintf(stderr, "Error occurred at line %d: pipe failed\n", __LINE__ - 1);
         exit(EXIT_FAILURE);
     }
 
     pid_t pid = fork();
 
-    if (pid == 0) { // child process
-        if (close(pipe_fd[0]) == -1) { // Closing read end, won't need it.
+    if (pid == 0) {  // child process
+        if (close(pipe_fd[0]) == -1) {  // Closing read end, won't need it.
             fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
-        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) { //redirecting stdout to pipe
+        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {  // redirecting stdout to pipe
             fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
         execlp("grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
-        fprintf(stderr, "Error occured at line %d: Failed to run execlp",__LINE__ - 1);
+        fprintf(stderr, "Error occured at line %d: Failed to run execlp", __LINE__ - 1);
         exit(EXIT_FAILURE);
-    } else if(pid > 0) { // Parent process
-        if (close(pipe_fd[1]) == -1) { // close off write
+    } else if (pid > 0) {  // Parent process
+        if (close(pipe_fd[1]) == -1) {  // close off write
             perror("Close Failed");
             exit(EXIT_FAILURE);
         }
         char reader[BUFSIZ];
-        if ((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1) { // read from pipe
+        if ((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1) {  // read from pipe
             perror("read failed");
             exit(EXIT_FAILURE);
         }
-        reader[bytes_read] = '\0'; // adding string term character to end of batch_size;
-        if (close(pipe_fd[0]) == -1) { // closing read end of pipe.
+        reader[bytes_read] = '\0';  // adding string term character to end of batch_size;
+        if (close(pipe_fd[0]) == -1) {  // closing read end of pipe.
             perror("close failed");
             exit(EXIT_FAILURE);
         }
-        wait(NULL);
+
+        pid_t wait_result;
+        do {
+            wait_result = wait(NULL);
+            if (wait_result == -1 && errno != EINTR) {
+                perror("wait failed");
+                exit(EXIT_FAILURE);
+            }
+        } while (wait_result == -1 && errno == EINTR);
+
         batch_size = atoi(reader);
     } else {
         perror("fork failed");
@@ -139,8 +148,9 @@ int get_batch_size() {
 // TODO: Implement this function
 void create_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
-        char *input_file = malloc(strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1);  // +1 for the null terminator
-        sprintf(input_file, "input/%s.in", argv_params[i]);
+        size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
+        char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
         FILE *file = fopen(input_file, "w");
         if (!file) {
             perror("Failed to open file");
@@ -155,8 +165,9 @@ void create_input_files(char **argv_params, int num_parameters) {
 // TODO: Implement this function
 void remove_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
-        char *input_file = malloc(strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1);  // +1 for the null terminator
-        sprintf(input_file, "input/%s.in", argv_params[i]);
+        size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
+        char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
         if (unlink(input_file) == -1) {
             perror("Failed to unlink file");
             free(input_file);
@@ -171,10 +182,10 @@ void remove_input_files(char **argv_params, int num_parameters) {
 void remove_output_files(autograder_results_t *results, int tested, int current_batch_size, char *param) {
     for (int i = 0; i < current_batch_size; ++i) {
         char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
-        char *output_file = malloc(strlen("output/") + strlen(exe_name) + strlen(param) + 2);
-        sprintf(output_file, "output/%s.%s", exe_name, param);
+        size_t len_output_file = strlen("output/") + strlen(exe_name) + strlen(param) + 2;  // +1 for the null terminator
+        char *output_file = malloc(len_output_file);
+        snprintf(output_file, len_output_file, "output/%s.%s", exe_name, param);
 
-        /*********** Uncomment before Submission *************/
         if (unlink(output_file) == -1) {
             perror("Failed to unlink file");
             free(output_file);
@@ -182,7 +193,7 @@ void remove_output_files(autograder_results_t *results, int tested, int current_
         }
 
         free(output_file);
-    } 
+    }
 }
 
 
@@ -197,7 +208,7 @@ int get_longest_len_executable(autograder_results_t *results, int num_executable
     }
     return longest_len;
 }
- 
+
 
 void write_results_to_file(autograder_results_t *results, int num_executables, int total_params) {
     FILE *file = fopen("results.txt", "w");
@@ -236,12 +247,12 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
         char *exe_name = get_exe_name(results[i].exe_path);
 
         char format[20];
-        sprintf(format, "%%-%ds:", longest_len);
-        fprintf(file, format, exe_name); // Write the program path
+        snprintf(format, sizeof(format), "%%-%ds:", longest_len);
+        fprintf(file, format, exe_name);  // Write the program path
         for (int j = 0; j < total_params; j++) {
-            fprintf(file, "%5d (", results[i].params_tested[j]); // Write the pi value for the program
+            fprintf(file, "%5d (", results[i].params_tested[j]);  // Write the pi value for the program
             const char* message = get_status_message(results[i].status[j]);
-            fprintf(file, "%9s) ", message); // Write each status
+            fprintf(file, "%9s) ", message);  // Write each status
         }
         fprintf(file, "\n");
     }
@@ -273,7 +284,6 @@ double get_score(char *result_line) {
 void write_scores_to_file(autograder_results_t *results, int num_executables, char *results_file) {
     FILE *file = fopen(results_file, "r");
     for (int i = 0; i < num_executables; i++) {
-
         char *line = NULL;
         size_t len = 0;
         getline(&line, &len, file);
@@ -297,7 +307,7 @@ void write_scores_to_file(autograder_results_t *results, int num_executables, ch
         int longest_len = get_longest_len_executable(results, num_executables);
 
         char format[20];
-        sprintf(format, "%%-%ds: ", longest_len);
+        snprintf(format, sizeof(format), "%%-%ds: ", longest_len);
         fprintf(score_fp, format, student_exe);
         fprintf(score_fp, "%5.3f\n", student_score);
 
