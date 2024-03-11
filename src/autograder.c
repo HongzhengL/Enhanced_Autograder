@@ -178,8 +178,6 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
         } while (pid == -1 && errno == EINTR);
 
         // TODO: Determine if the child process finished normally, segfaulted, or timed out
-        int exit_status = WEXITSTATUS(status);
-        // printf("exit_status = %d, status = %d\n", exit_status, status);
         int exited = WIFEXITED(status);
         int signaled = WIFSIGNALED(status);
         int final_status;

@@ -44,7 +44,10 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         param = atoi(buffer);
-
+        if (close(pipefd) == -1) {
+            perror("close failed");
+            exit(EXIT_FAILURE);
+        }
     #endif
 
     seed += param;
@@ -85,6 +88,6 @@ int main(int argc, char *argv[]) {
         default:
             break;
     }
-
+    
     return 0;
 }
