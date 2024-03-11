@@ -39,7 +39,10 @@ int main(int argc, char *argv[]) {
     #elif PIPE
         int pipefd = atoi(argv[1]);
         char buffer[BUFSIZ];
-        read(pipefd, buffer, BUFSIZ);
+        if (read(pipefd, buffer, BUFSIZ) == -1) { 
+            perror("Read failed");
+            exit(EXIT_FAILURE);
+        }
         param = atoi(buffer);
 
     #endif

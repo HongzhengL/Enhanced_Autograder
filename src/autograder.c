@@ -65,8 +65,9 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
 
         // TODO (Change 2): Handle different cases for input source
         #ifdef EXEC
-            execl(executable_path, executable_name, input, NULL);
 
+            execl(executable_path, executable_name, input, NULL);
+            
         #elif REDIR
 
             // TODO: Redirect STDIN to input/<input>.in file
@@ -128,7 +129,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
 
         sa.sa_handler = timeout_handler;
         sa.sa_flags = 0;
-        sigemptyset(&sa.sa_mask);
+        if (sigemptyset(&sa.sa_mask) == -1) { 
+            perror("Failed to empty sig set");
+            exit(EXIT_FAILURE);
+        }
         if (sigaction(SIGALRM, &sa, NULL) == -1) {
             perror("Failed to set up signal handler");
             exit(1);
@@ -175,7 +179,7 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
 
         // TODO: Determine if the child process finished normally, segfaulted, or timed out
         int exit_status = WEXITSTATUS(status);
-        printf("exit_status = %d, status = %d\n", exit_status, status);
+        // printf("exit_status = %d, status = %d\n", exit_status, status);
         int exited = WIFEXITED(status);
         int signaled = WIFSIGNALED(status);
         int final_status;
