@@ -312,5 +312,7 @@ void write_scores_to_file(autograder_results_t *results, int num_executables, ch
         fprintf(score_fp, "%5.3f\n", student_score);
 
         fclose(score_fp);
+        free(line);
     }
+    fclose(file);
 }
