@@ -13,15 +13,16 @@ void infinite_loop() {
 int main(int argc, char *argv[]) {
     #ifndef REDIR
         if (argc < 2) {
-            // Usage for  EXEC:  argv[0] <param>    # Input is just param
-            // Usage for  PIPE:  argv[0] <pipefd>   # Input is read end pipe fd
-            // Usage for REDIR:  argv[0]            # No param needed, read from stdin
+            // Usage for   EXEC:  argv[0] <param>    # Input is just param
+            // Usage for   PIPE:  argv[0] <pipefd>   # Input is read end pipe fd
+            // Usage for  REDIR:  argv[0]            # No param needed, read from stdin
+            // Usage for MQUEUE:  argv[0] <param>    # Input is just param
             printf("Usage: %s <parameter | pipefd>\n", argv[0]);
             return 1;
         }
     #endif
 
-    unsigned int seed = 0;
+    int seed = 0;
 
     for (int i = 0; argv[0][i] != '\0'; i++) {
         seed += (unsigned char)argv[0][i]; 
@@ -48,6 +49,10 @@ int main(int argc, char *argv[]) {
             perror("close failed");
             exit(EXIT_FAILURE);
         }
+
+    #elif MQUEUE
+        // TODO
+
     #endif
 
     seed += param;
