@@ -48,6 +48,10 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
     // Allocate memory for the array of strings
     char **executables = (char **) malloc(*num_executables * sizeof(char *));
+    if (!executables) {
+        perror("Failed to allocate memory");
+        exit(EXIT_FAILURE);
+    }
 
     // Reset the directory stream
     rewinddir(dir);
@@ -63,6 +67,10 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
             if (S_ISREG(st.st_mode) && entry->d_name[0] != '.') {
                 int len_executable = strlen(solution_dir) + strlen(entry->d_name) + 2;
                 executables[i] = (char *) malloc((len_executable) * sizeof(char));
+                if (!executables[i]) {
+                    perror("Failed to allocate memory");
+                    exit(EXIT_FAILURE);
+                }
                 snprintf(executables[i], len_executable, "%s/%s", solution_dir, entry->d_name);
                 i++;
             }
@@ -141,6 +149,10 @@ void create_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
         char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        if (input_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
         snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
         FILE *file = fopen(input_file, "w");
         if (!file) {
@@ -202,6 +214,10 @@ void remove_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
         char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        if (input_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
         snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
         if (unlink(input_file) == -1) {
             perror("Failed to unlink file");
@@ -219,6 +235,10 @@ void remove_output_files(autograder_results_t *results, int tested, int current_
         char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
         size_t len_output_file = strlen("output/") + strlen(exe_name) + strlen(param) + 2;  // +1 for the null terminator
         char *output_file = malloc(len_output_file);
+        if (output_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
         snprintf(output_file, len_output_file, "output/%s.%s", exe_name, param);
 
         if (unlink(output_file) == -1) {
@@ -311,7 +331,6 @@ double get_score(char *result_line) {
         ++total;
         token = strstr(token + 1, "(");
     }
-    printf("%d %d\n", correct, total);
     return (double) correct / total * 1.0;
 }
 

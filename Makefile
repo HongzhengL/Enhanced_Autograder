@@ -73,7 +73,8 @@ clean:
 	rm -f input/*.in output/*
 	rm -rf test_results
 
-zip: clean
+zip:
+	@make clean
 	zip -r $(PROJECT_NAME).zip include lib src input output solutions expected Makefile README.md
 
 test-setup:

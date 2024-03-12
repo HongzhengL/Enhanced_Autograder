@@ -18,7 +18,7 @@ int *child_status;
 void timeout_handler(int signum) {
     for (int j = 0; j < curr_batch_size; j++) {
         if (child_status[j] == 1) {  // Checks if child is still running
-            if (kill(pids[j], SIGKILL) == 1) {  // does check on kill signal to see if successful
+            if (kill(pids[j], SIGKILL) == -1) {  // does check on kill signal to see if successful
                 perror("Kill Failed");
                 exit(EXIT_FAILURE);
             }
@@ -49,16 +49,24 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
 
         int len_output_path = strlen("output/") + strlen(executable_name) + strlen(input) + 2;  // +2 for the null terminator and the dot
         char *output_path = malloc(len_output_path);
+        if (output_path == NULL) {
+            fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
         snprintf(output_path, len_output_path, "output/%s.%s", executable_name, input);
 
         int fd;
         if ((fd = open(output_path, O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1) {
             free(output_path);
-            fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
+            fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
         }
         if (dup2(fd, STDOUT_FILENO) == -1) {
             fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        if (close(fd) == -1) {
+            fprintf(stderr, "Error occured at line %d: close failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
         }
         free(output_path);
@@ -73,6 +81,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
             // TODO: Redirect STDIN to input/<input>.in file
             int len_input_path = strlen("input/") + strlen(input) + strlen(".in") + 1;  // +1 for the null terminator
             char *input_path = malloc(len_input_path);    // +1 for the null terminator
+            if (input_path == NULL) {
+                fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+                exit(EXIT_FAILURE);
+            }
             snprintf(input_path, len_input_path, "input/%s.in", input);
 
             int child_fd = open(input_path, O_RDONLY);
@@ -83,6 +95,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
             }
             if (dup2(child_fd, STDIN_FILENO) == -1) {
                 fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
+            if (close(child_fd) == -1) {
+                fprintf(stderr, "Error occured at line %d: close failed\n", __LINE__ - 1);
                 exit(EXIT_FAILURE);
             }
             execl(executable_path, executable_name, NULL);
@@ -135,6 +151,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
 void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
     // Keep track of finished processes for alarm handler
     child_status = malloc(curr_batch_size * sizeof(int));
+    if (child_status == NULL) {
+        fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+        exit(EXIT_FAILURE);
+    }
     for (int j = 0; j < curr_batch_size; j++) {
         child_status[j] = 1;
     }
@@ -167,6 +187,10 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
             char *executable_name = get_exe_name(results[tested - curr_batch_size + j].exe_path);
             int length_output_path = strlen("output/") + strlen(executable_name) + strlen(param) + 2;  // +2 for the null terminator and the dot
             char *output_path = malloc(length_output_path);    // +2 for the null terminator and the dot
+            if (output_path == NULL) {
+                fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+                exit(EXIT_FAILURE);
+            }
             snprintf(output_path, length_output_path, "output/%s.%s", executable_name, param);
 
             int fd;
@@ -183,6 +207,10 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
                 perror("Read Failed");
                 exit(EXIT_FAILURE);
             }
+            if (close(fd) == -1) {
+                perror("close failed");
+                exit(EXIT_FAILURE);
+            }
             output[bytes_read] = '\0';
             if (atoi(output) == 0) {
                 final_status = CORRECT;
@@ -192,7 +220,6 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
                 perror("Invalid output");
                 exit(EXIT_FAILURE);
             }
-            close(fd);
         }
 
         // TODO: Also, update the results struct with the status of the child process
@@ -229,10 +256,22 @@ int main(int argc, char *argv[]) {
 
     // Construct summary struct
     results = malloc(num_executables * sizeof(autograder_results_t));
+    if (results == NULL) {
+        fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < num_executables; i++) {
         results[i].exe_path = executable_paths[i];
         results[i].params_tested = malloc((total_params) * sizeof(int));
+        if (results[i].params_tested == NULL) {
+            fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
         results[i].status = malloc((total_params) * sizeof(int));
+        if (results[i].status == NULL) {
+            fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
     }
 
     #ifdef REDIR
@@ -250,6 +289,10 @@ int main(int argc, char *argv[]) {
             // Determine current batch size - min(remaining, batch_size)
             curr_batch_size = remaining < batch_size ? remaining : batch_size;
             pids = malloc(curr_batch_size * sizeof(pid_t));
+            if (pids == NULL) {
+                fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
+                exit(EXIT_FAILURE);
+            }
 
             // TODO: Execute the programs in batch size chunks
             for (int j = 0; j < curr_batch_size; j++) {
