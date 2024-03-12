@@ -14,7 +14,7 @@ int total_params;         // Total number of parameters to test - (argc - 2)
 int *child_status;
 
 
-// TODO: Timeout handler for alarm signal
+// TODO (Change 3): Timeout handler for alarm signal - kill remaining running child processes
 void timeout_handler(int signum) {
     for (int j = 0; j < curr_batch_size; j++) {
         if (child_status[j] == 1) {  // Checks if child is still running
@@ -123,31 +123,6 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
             }
         #endif
 
-        // TODO (Change 3): Setup timer to determine if child process is stuck
-        struct sigaction sa;
-        struct itimerval interval;
-
-        sa.sa_handler = timeout_handler;
-        sa.sa_flags = 0;
-        if (sigemptyset(&sa.sa_mask) == -1) { 
-            perror("Failed to empty sig set");
-            exit(EXIT_FAILURE);
-        }
-        if (sigaction(SIGALRM, &sa, NULL) == -1) {
-            perror("Failed to set up signal handler");
-            exit(1);
-        }
-
-        interval.it_interval.tv_sec = 0;
-        interval.it_interval.tv_usec = 0;
-        interval.it_value.tv_sec = TIMEOUT_SECS;
-        interval.it_value.tv_usec = 0;
-
-        if (setitimer(ITIMER_REAL, &interval, NULL) == -1) {
-            perror("Failed to set up timer");
-            exit(1);
-        }
-
         pids[batch_idx] = pid;
     } else {  // Fork failed
         perror("Failed to fork");
@@ -168,6 +143,7 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
     for (int j = 0; j < curr_batch_size; j++) {
         int status;
         errno = 0;
+        // TODO: What if waitpid is interrupted by a signal?
         pid_t pid;
         do {
             pid = waitpid(pids[j], &status, 0);
@@ -222,23 +198,14 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
         // TODO: Also, update the results struct with the status of the child process
         results[tested - curr_batch_size + j].status[param_idx] = final_status;
 
+        // NOTE: Make sure you are using the output/<executable>.<input> file to determine the status
+        //       of the child process, NOT the exit status like in Project 1.
+
         // Adding tested parameter to results struct
         results[tested - curr_batch_size + j].params_tested[param_idx] = atoi(param);
 
         // Mark the process as finished
         child_status[j] = -1;
-    }
-
-    // TODO: Cancel the timer
-    struct itimerval interval;
-    interval.it_interval.tv_sec = 0;
-    interval.it_interval.tv_usec = 0;
-    interval.it_value.tv_sec = 0;  // Stopping Timer.
-    interval.it_value.tv_usec = 0;
-
-    if (setitimer(ITIMER_REAL, &interval, 0)) {
-        perror("setitimer");
-        exit(EXIT_FAILURE);
     }
 
     free(child_status);
@@ -269,7 +236,7 @@ int main(int argc, char *argv[]) {
     }
 
     #ifdef REDIR
-        // TODO: Create the input/<input>.in files
+        // TODO: Create the input/<input>.in files and write the parameters to them
         create_input_files(argv + 2, total_params);  // Implement this function (src/utils.c)
     #endif
 
@@ -284,14 +251,22 @@ int main(int argc, char *argv[]) {
             curr_batch_size = remaining < batch_size ? remaining : batch_size;
             pids = malloc(curr_batch_size * sizeof(pid_t));
 
-            // Execute the programs in batch size chunks
+            // TODO: Execute the programs in batch size chunks
             for (int j = 0; j < curr_batch_size; j++) {
                 execute_solution(executable_paths[tested], argv[i], j);
                 tested++;
             }
 
-            // Wait for the batch to finish and check results
+            // TODO (Change 3): Setup timer to determine if child process is stuck
+            start_timer(TIMEOUT_SECS, timeout_handler);  // Implement this function (src/utils.c)
+
+            // TODO: Wait for the batch to finish and check results
             monitor_and_evaluate_solutions(tested, argv[i], i - 2);
+
+            // TODO: Cancel the timer if all child processes have finished
+            if (child_status == NULL) {
+                cancel_timer();  // Implement this function (src/utils.c)
+            }
 
             // TODO Unlink all output files in current batch (output/<executable>.<input>)
             remove_output_files(results, tested, curr_batch_size, argv[i]);  // Implement this function (src/utils.c)

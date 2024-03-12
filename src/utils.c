@@ -18,15 +18,6 @@ char *get_exe_name(char *path) {
 }
 
 
-int get_tag(char *executable_name) {
-    unsigned int seed = 0;
-    for (int i = 0; i < strlen(executable_name); i++) {
-        seed += (int)executable_name[i];
-    }
-    return seed;
-}
-
-
 char **get_student_executables(char *solution_dir, int *num_executables) {
     DIR *dir;
     struct dirent *entry;
@@ -161,6 +152,50 @@ void create_input_files(char **argv_params, int num_parameters) {
         free(input_file);
     }
 }
+
+
+// TODO: Implement this function
+void start_timer(int seconds, void (*timeout_handler)(int)) {
+    struct sigaction sa;
+    struct itimerval interval;
+
+    sa.sa_handler = timeout_handler;
+    sa.sa_flags = 0;
+    if (sigemptyset(&sa.sa_mask) == -1) { 
+        perror("Failed to empty sig set");
+        exit(EXIT_FAILURE);
+    }
+    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+        perror("Failed to set up signal handler");
+        exit(1);
+    }
+
+    interval.it_interval.tv_sec = 0;
+    interval.it_interval.tv_usec = 0;
+    interval.it_value.tv_sec = TIMEOUT_SECS;
+    interval.it_value.tv_usec = 0;
+
+    if (setitimer(ITIMER_REAL, &interval, NULL) == -1) {
+        perror("Failed to set up timer");
+        exit(1);
+    }
+}
+
+
+// TODO: Implement this function
+void cancel_timer() {
+    struct itimerval interval;
+    interval.it_interval.tv_sec = 0;
+    interval.it_interval.tv_usec = 0;
+    interval.it_value.tv_sec = 0;  // Stopping Timer.
+    interval.it_value.tv_usec = 0;
+
+    if (setitimer(ITIMER_REAL, &interval, 0)) {
+        perror("setitimer");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 // TODO: Implement this function
 void remove_input_files(char **argv_params, int num_parameters) {

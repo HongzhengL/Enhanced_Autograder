@@ -1,95 +1,99 @@
 #include "utils.h"
 
-// Batch size is determined at runtime now
-pid_t *pids;
+pid_t *workers;          // Workers determined by batch size
+int *worker_done;        // 1 for done, 0 for still running
 
 // Stores the results of the autograder (see utils.h for details)
 autograder_results_t *results;
 
 int num_executables;      // Number of executables in test directory
-int curr_batch_size;      // At most batch_size executables will be run at once
 int total_params;         // Total number of parameters to test - (argc - 2)
-
-// Contains status of child processes (-1 for done, 1 for still running)
-int *child_status;
+int num_workers;          // Number of workers to spawn
 
 
-// TODO: Timeout handler for alarm signal
-void timeout_handler(int signum) {
-
-}
-
-
-// Execute the student's executable using exec()
-void execute_solution(char *executable_path, char **argv_params, int msgid, int batch_idx) {
+void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
     
     pid_t pid = fork();
 
     // Child process
     if (pid == 0) {
-        char *executable_name = get_exe_name(executable_path);
 
-        // TODO: exec() the student's executable and pass msgid as an argument
-        
-        perror("Failed to execute program");
+        // TODO: exec() the worker program and pass it the message queue id and worker id.
+        //       Use ./worker as the path to the worker program.
+
+        perror("Failed to spawn worker");
         exit(1);
     } 
     // Parent process
     else if (pid > 0) {
-        // TOOD: Send all of the input parameters to the child process via the message queue.
-        //       Remember to use get_tag() to determine the message type.
+        // TODO: Send the total number of pairs to worker via message queue (mtype = worker_id)
+        
 
-        // TODO: Send END message to child process to indicate that all parameters have been sent
-
-        // TODO: Setup timer to determine if child process is stuck
-       
-        pids[batch_idx] = pid;
+        // Store the worker's pid for monitoring
+        workers[worker_id - 1] = pid;
     }
-    // Fork failed
+    // Fork failed 
     else {
-        perror("Failed to fork");
+        perror("Failed to fork worker");
         exit(1);
     }
 }
 
 
-// Wait for the batch to finish and check results
-void monitor_and_evaluate_solutions(int tested, char **argv_params, int msgid) {
-    // Keep track of finished processes for alarm handler
-    child_status = malloc(curr_batch_size * sizeof(int));
-    for (int i = 0; i < curr_batch_size; i++) {
-        child_status[i] = 1;
-    }
-
-    // MAIN EVALUATION LOOP: Wait until each process has finished or timed out
-    for (int i = 0; i < curr_batch_size; i++) {
-
-        int status;
-        pid_t pid = waitpid(pids[i], &status, 0);
-
-        // TODO: Determine if the child process finished normally, segfaulted, or timed out
-        int exit_status = WEXITSTATUS(status);
-        int exited = WIFEXITED(status);
-        int signaled = WIFSIGNALED(status);
-
-        
-        // This part is very similar to the autograder.c version, the main difference is now you 
-        // have to check multiple output files (for each parameter) for each executable at a time.
-        
-        // Adding tested parameters (all of them) to results struct
-        for (int j = 0; j < total_params; j++) {
-            results[tested - curr_batch_size + i].params_tested[j] = atoi(argv_params[j]);
-        }
-
-        // Mark the process as finished
-        child_status[i] = -1;
-    }
-
-    // TODO: Cancel the timer
-
-    free(child_status);
+// TODO: Receive ACK from all workers using message queue (mtype = BROADCAST_MTYPE)
+void receive_ack_from_workers(int msqid, int num_workers) {
+    
 }
 
+
+// TODO: Send SYNACK to all workers using message queue (mtype = BROADCAST_MTYPE)
+void send_synack_to_workers(int msqid, int num_workers) {
+    
+}
+
+
+// Wait for all workers to finish and collect their results from message queue
+void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
+    int received = 0;
+    worker_done = malloc(num_workers * sizeof(int));
+    for (int i = 0; i < num_workers; i++) {
+        worker_done[i] = 0;
+    }
+
+    while (received < pairs_to_test) {
+        for (int i = 0; i < num_workers; i++) {
+            if (worker_done[i] == 1) {
+                continue;
+            }
+
+            // Check if worker has finished
+            pid_t retpid = waitpid(workers[i], NULL, WNOHANG);
+            
+            int msgflg;
+            if (retpid > 0)
+                // Worker has finished and still has messages to receive
+                msgflg = 0;
+            else if (retpid == 0)
+                // Worker is still running -> receive intermediate results
+                msgflg = IPC_NOWAIT;
+            else {
+                // Error
+                perror("Failed to wait for child process");
+                exit(1);
+            }
+
+            // TODO: Receive results from worker and store them in the results struct.
+            //       If message is "DONE", set worker_done[i] to 1 and break out of loop.
+            //       Messages will have the format ("%s %d %d", executable_path, parameter, status)
+            //       so consider using sscanf() to parse the message.
+            while (1) {
+                
+            }
+        }
+    }
+
+    free(worker_done);
+}
 
 
 int main(int argc, char *argv[]) {
@@ -101,10 +105,7 @@ int main(int argc, char *argv[]) {
     char *testdir = argv[1];
     total_params = argc - 2;
 
-    int batch_size = get_batch_size();
-
     char **executable_paths = get_student_executables(testdir, &num_executables);
-
 
     // Construct summary struct
     results = malloc(num_executables * sizeof(autograder_results_t));
@@ -114,48 +115,61 @@ int main(int argc, char *argv[]) {
         results[i].status = malloc((total_params) * sizeof(int));
     }
 
-    // TODO: Create a unique key for message queue (CHANGE src/mq_autograder.c TO SOME UNIQUE FILENAME).
-    //       For example: create a file with your x500 and use that as the first argument to ftok.
-    key_t key = ftok("src/mq_autograder.c", 777); 
-    if (key == -1) {
-        perror("Failed to create key");
-        exit(1);
+    num_workers = get_batch_size();
+    // Check if some workers won't be used -> don't spawn them
+    if (num_workers > num_executables * total_params) {
+        num_workers = num_executables * total_params;
     }
+    workers = malloc(num_workers * sizeof(pid_t));
+
+    // Create a unique key for message queue
+    key_t key = IPC_PRIVATE;
 
     // TODO: Create a message queue
-    int msgid;
+    int msqid;
+
+    int num_pairs_to_test = num_executables * total_params;
     
-    // MAIN LOOP: For a batch of executables at a time, test all parameters
-    int finished = 0;
-    int tested = 0;
-    while (finished < num_executables) {
-        // Determine the number of executables to test in this batch
-        curr_batch_size = num_executables - finished > batch_size ? batch_size : num_executables - finished;
-        pids = malloc(curr_batch_size * sizeof(pid_t));
+    // Spawn workers and send them the total number of (executable, parameter) pairs they will test
+    for (int i = 0; i < num_workers; i++) {
+        int leftover = num_pairs_to_test % num_workers - i > 0 ? 1 : 0;
+        int pairs_per_worker = num_pairs_to_test / num_workers + leftover;
 
-        // Execute the executables in the batch
-        for (int i = 0; i < curr_batch_size; i++) {
-            execute_solution(executable_paths[finished + i], argv + 2, msgid, i);
-            tested++;
-        }
-
-        sleep(2);  // Give the child processes time to start
-
-        // Wait for the batch to finish and check results
-        monitor_and_evaluate_solutions(tested, argv + 2, msgid);
-
-        // TODO: Unlink all output files in current batch (output/<executable>.<input>)
-
-
-        finished += curr_batch_size;
-
+        // TODO: Spawn worker and send it the number of pairs it will test via message queue
+        launch_worker(msqid, pairs_per_worker, i + 1);
     }
+
+    // Send (executable, parameter) pairs to workers
+    int sent = 0;
+    for (int i = 0; i < total_params; i++) {
+        for (int j = 0; j < num_executables; j++) {
+            msgbuf_t msg;
+            long worker_id = sent % num_workers + 1;
+            
+            // TODO: Send (executable, parameter) pair to worker via message queue (mtype = worker_id)
+
+            sent++;
+        }
+    }
+
+    // TODO: Wait for ACK from workers to tell all workers to start testing (synchronization)
+    receive_ack_from_workers(msqid, num_workers);
+
+    // TODO: Send message to workers to allow them to start testing
+    send_synack_to_workers(msqid, num_workers);
+
+    // TODO: Wait for all workers to finish and collect their results from message queue
+    wait_for_workers(msqid, num_pairs_to_test, argv + 2);
+
+    // TODO: Remove ALL output files (output/<executable>.<input>)
+
 
     write_results_to_file(results, num_executables, total_params);
 
-    // You can use this to debug
+    // You can use this to debug your scores function
     // get_score("results.txt", results[0].exe_path);
 
+    // Print each score to scores.txt
     write_scores_to_file(results, num_executables, "results.txt");
 
     // TODO: Remove the message queue
@@ -170,8 +184,7 @@ int main(int argc, char *argv[]) {
 
     free(results);
     free(executable_paths);
-
-    free(pids);
+    free(workers);
     
     return 0;
-}     
+}
