@@ -20,7 +20,7 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
 
         // TODO: exec() the worker program and pass it the message queue id and worker id.
         //       Use ./worker as the path to the worker program.
-
+        execl("./worker", "./worker", msqid, worker_id, NULL);
         perror("Failed to spawn worker");
         exit(1);
     } 
