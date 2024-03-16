@@ -27,8 +27,14 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
     // Parent process
     else if (pid > 0) {
         // TODO: Send the total number of pairs to worker via message queue (mtype = worker_id)
-        
+        msgbuf_t message;
+        message.mtype = worker_id;
+        strncpy(message.mtext, pairs_per_worker, sizeof(message.mtext) - 1);
 
+        if (msgsnd(msqid, &message, sizeof(message), 0) == -1) {
+            perror("Failed to send # of pairs to worker");
+            exit(EXIT_FAILURE);
+        }
         // Store the worker's pid for monitoring
         workers[worker_id - 1] = pid;
     }
@@ -128,6 +134,12 @@ int main(int argc, char *argv[]) {
     // TODO: Create a message queue
     int msqid;
 
+    if(msgget(key, 0666 | IPC_CREAT) == -1) {
+        perror("Message queue setup failed");
+        exit(EXIT_FAILURE);
+    }
+
+
     int num_pairs_to_test = num_executables * total_params;
     
     // Spawn workers and send them the total number of (executable, parameter) pairs they will test
@@ -173,7 +185,12 @@ int main(int argc, char *argv[]) {
     write_scores_to_file(results, num_executables, "results.txt");
 
     // TODO: Remove the message queue
-
+    if (msqid != -1) {
+        if (msgctl(msqid, IPC_RMID, NULL) == -1) {
+            perror("msgctl failed");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Free the results struct and its fields
     for (int i = 0; i < num_executables; i++) {

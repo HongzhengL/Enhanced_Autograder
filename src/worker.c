@@ -43,14 +43,16 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
     if (pid == 0) {
         char *executable_name = get_exe_name(executable_path);
 
-        // TODO: Redirect STDOUT to output/<executable>.<input> file
-        int len_output_path = strlen("output/") + strlen(executable_name) + strlen(input) + 2;  // +2 for the null terminator and the dot
+        // TODO: Redirect STDOUT to output/<executable>.<param> file
+        char param_str[20];
+        sprintf(param_str, "%d", param);
+        int len_output_path = strlen("output/") + strlen(executable_name) + strlen(param_str) + 2;  // +2 for the null terminator and the dot
         char *output_path = malloc(len_output_path);
         if (output_path == NULL) {
             fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
         }
-        snprintf(output_path, len_output_path, "output/%s.%s", executable_name, input);
+        snprintf(output_path, len_output_path, "output/%s.%s", executable_name, param_str);
 
         int fd;
         if ((fd = open(output_path, O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1) {
@@ -69,7 +71,7 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
         free(output_path);
         
         // TODO: Input to child program can be handled as in the EXEC case (see template.c)
-        execl(executable_path, executable_name, param, NULL);
+        execl(executable_path, executable_name, param_str, NULL);
         perror("Failed to execute program in worker");
         exit(1);
     }
@@ -126,14 +128,20 @@ void monitor_and_evaluate_solutions(int finished) {
                 final_status = STUCK_OR_INFINITE;
             }
         } else if (exited) {
-            char *executable_name = get_exe_name(results[tested - curr_batch_size + j].exe_path);
-            int length_output_path = strlen("output/") + strlen(executable_name) + strlen(param) + 2;  // +2 for the null terminator and the dot
+            char *executable_path = pairs[finished - curr_batch_size + j].executable_path;
+            int parameter = pairs[finished - curr_batch_size + j].parameter;
+
+            char *executable_name = get_exe_name(executable_path);
+            char param_str[20];
+            sprintf(param_str, "%d", parameter);
+            int length_output_path = strlen("output/") + strlen(executable_name) + strlen(param_str) + 2;  // +2 for the null terminator and the dot
             char *output_path = malloc(length_output_path);    // +2 for the null terminator and the dot
+
             if (output_path == NULL) {
                 fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
                 exit(EXIT_FAILURE);
             }
-            snprintf(output_path, length_output_path, "output/%s.%s", executable_name, param);
+            snprintf(output_path, length_output_path, "output/%s.%s", executable_name, param_str);
 
             int fd;
             if ((fd = open(output_path, O_RDONLY)) == -1) {
@@ -142,6 +150,8 @@ void monitor_and_evaluate_solutions(int finished) {
                 exit(EXIT_FAILURE);
             }
             free(output_path);
+            free(executable_path);
+            free(executable_name);
 
             int bytes_read;
             char output[MAX_INT_CHARS + 1];  // +1 for the null terminator
@@ -162,6 +172,7 @@ void monitor_and_evaluate_solutions(int finished) {
                 perror("Invalid output");
                 exit(EXIT_FAILURE);
             }
+            
         }
         if (final_status == NULL) {
             perror("No final status received");
@@ -187,17 +198,24 @@ void send_results(int msqid, long mtype, int finished) {
         int status = pairs[finished - curr_batch_size + i].status;
         
         // Setting up message. 
-        struct msgbuf_t message;
+        msgbuf_t message;
         message.mtype = mtype;
 
         //Setting message text
         int length_msg = strlen(executable_path) + parameter + status + 3;  // +3 for the null terminator and the 2 spaces
         char *message_text = malloc(length_msg);
-        snprintf(message_text, length_msg, "%s %d %d", executable_path, parameter, status);
-        message.mtext = message_text;
-        
 
-        if (msgsnd(msgid, &message, sizeof(message), 0) == -1) {
+        if (message_text == NULL) {
+            perror("malloc of message_text failed");
+            exit(EXIT_FAILURE);
+        }
+
+        snprintf(message_text, length_msg, "%s %d %d", executable_path, parameter, status);
+
+        strncpy(message.mtext, message_text, MESSAGE_SIZE - 1);
+        message.mtext[MESSAGE_SIZE - 1] = '\0';
+        
+        if (msgsnd(msqid, &message, sizeof(message), 0) == -1) {
             free(message_text);
             free(executable_path);
             perror("Failed to send results");
@@ -211,10 +229,12 @@ void send_results(int msqid, long mtype, int finished) {
 
 // Send DONE message to autograder to indicate that the worker has finished testing
 void send_done_msg(int msqid, long mtype) {
-    struct msgbuf_t message;
+    msgbuf_t message;
     message.mtype = mtype;
-    message.mtext = "DONE";
-    if (msgsnd(msgid, &message, sizeof(message), 0) == -1) {
+    char message_to_send[] = "DONE";
+    strcpy(message.mtext, message_to_send);
+
+    if (msgsnd(msqid, &message, sizeof(message), 0) == -1) {
         perror("Failed to send DONE");
         exit(EXIT_FAILURE);
     }
@@ -232,18 +252,59 @@ int main(int argc, char **argv) {
 
     // TODO: Receive initial message from autograder specifying the number of (executable, parameter) 
     // pairs that the worker will test (should just be an integer in the message body). (mtype = worker_id)
+    msgbuf_t init_msg;
+    if (msgrcv(msqid, &init_msg, sizeof(init_msg), worker_id, 0) == -1) {
+        perror("Initial setup message from master receive failed");
+        exit(EXIT_FAILURE);
+    }
 
     // TODO: Parse message and set up pairs_t array
-    int pairs_to_test;
+
+    int pairs_to_test = atoi(init_msg.mtext);
+    pairs = malloc(pairs_to_test);
 
     // TODO: Receive (executable, parameter) pairs from autograder and store them in pairs_t array.
     //       Messages will have the format ("%s %d", executable_path, parameter). (mtype = worker_id)
+    for (int i = 0; i < pairs_to_test; i++) {
+        msgbuf_t pair;
+        if (msgrcv(msqid, &pair, sizeof(pair), worker_id, 0) == -1) {
+            perror("Pair retrieval failed");
+            exit(EXIT_FAILURE);
+        }
+
+        char message_received[MESSAGE_SIZE] = pair.mtext;
+        
+        char *pair_part = strtok(message_received, " ");
+        pairs[i].executable_path = malloc(strlen(pair_part) + 1); //1 for null terminator.
+        
+        // Retrieving executable_path
+        strcpy(pairs[i].executable_path, pair_part);
+        
+        // Retrieving parameter
+        pair_part = strtok(NULL, " ");
+        if (pair_part != NULL) {
+            pairs[i].parameter = atoi(pair_part);
+        } else {
+            perror("Parameter missing");
+            exit(EXIT_FAILURE);
+        }
+        free(pair_part);
+    }
 
     // TODO: Send ACK message to mq_autograder after all pairs received (mtype = BROADCAST_MTYPE)
+    msgbuf_t ack;
+    ack.mtype = BROADCAST_MTYPE;
+    char ack_message[] = "ACK";
+    strcpy(ack.mtext, ack_message);
+    if (msgsnd(msqid, &ack, sizeof(ack), 0) == -1) {
+        perror("msgsnd");
+        exit(EXIT_FAILURE);
+    }
+
 
     // TODO: Wait for SYNACK from autograder to start testing (mtype = BROADCAST_MTYPE).
     //       Be careful to account for the possibility of receiving ACK messages just sent.
-
+    
 
     // Run the pairs in batches of 8 and send results back to autograder
     for (int i = 0; i < pairs_to_test; i+= PAIRS_BATCH_SIZE) {
