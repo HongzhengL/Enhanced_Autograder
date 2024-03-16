@@ -128,12 +128,9 @@ void monitor_and_evaluate_solutions(int finished) {
                 final_status = STUCK_OR_INFINITE;
             }
         } else if (exited) {
-            char *executable_path = pairs[finished - curr_batch_size + j].executable_path;
-            int parameter = pairs[finished - curr_batch_size + j].parameter;
-
-            char *executable_name = get_exe_name(executable_path);
+            char *executable_name = get_exe_name(current_exe_path);
             char param_str[20];
-            sprintf(param_str, "%d", parameter);
+            sprintf(param_str, "%d", current_param);
             int length_output_path = strlen("output/") + strlen(executable_name) + strlen(param_str) + 2;  // +2 for the null terminator and the dot
             char *output_path = malloc(length_output_path);    // +2 for the null terminator and the dot
 
@@ -150,7 +147,6 @@ void monitor_and_evaluate_solutions(int finished) {
                 exit(EXIT_FAILURE);
             }
             free(output_path);
-            free(executable_path);
             free(executable_name);
 
             int bytes_read;
@@ -178,12 +174,13 @@ void monitor_and_evaluate_solutions(int finished) {
             perror("No final status received");
             exit(EXIT_FAILURE);
         }
-        pairs[finished - curr_batch_size + j].status = final_status;
+        pairs[finished + j].status = final_status;
 
         // Mark the process as finished
         child_status[j] = -1;
+        free(current_exe_path);
     }
-
+    
     free(child_status);
 }
 
