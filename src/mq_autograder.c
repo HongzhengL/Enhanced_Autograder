@@ -20,15 +20,24 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
 
         // TODO: exec() the worker program and pass it the message queue id and worker id.
         //       Use ./worker as the path to the worker program.
-
+        char msqid_str[MAX_INT_CHARS + 1];
+        char worker_id_str[MAX_INT_CHARS + 1];
+        snprintf(msqid_str, MAX_INT_CHARS, "%d", msqid);
+        snprintf(worker_id_str, MAX_INT_CHARS, "%d", worker_id);
+        execl("./worker", "worker", msqid_str, worker_id_str, NULL);
         perror("Failed to spawn worker");
         exit(1);
-    } 
+    }
     // Parent process
     else if (pid > 0) {
         // TODO: Send the total number of pairs to worker via message queue (mtype = worker_id)
-        
-
+        msgbuf_t msg;
+        msg.mtype = worker_id;
+        snprintf(msg.mtext, MESSAGE_SIZE, "%d", pairs_per_worker);
+        if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
+            perror("Failed to send message to worker");
+            exit(1);
+        }
         // Store the worker's pid for monitoring
         workers[worker_id - 1] = pid;
     }
@@ -42,13 +51,35 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
 
 // TODO: Receive ACK from all workers using message queue (mtype = BROADCAST_MTYPE)
 void receive_ack_from_workers(int msqid, int num_workers) {
-    
+    printf("Waiting for ACK from workers\n");
+    int received = 0;
+    while (received < num_workers) {
+        msgbuf_t msg;
+        if (msgrcv(msqid, &msg, sizeof(msg), BROADCAST_MTYPE + 1, 0) == -1) {
+            perror("Failed to receive message from worker");
+            exit(EXIT_FAILURE);
+        }
+        printf("Received: %s\n", msg.mtext);
+        if (strcmp(msg.mtext, "ACK") == 0) {
+            received++;
+        }
+        printf("received: %d / %d\n", received, num_workers);
+    }
 }
 
 
 // TODO: Send SYNACK to all workers using message queue (mtype = BROADCAST_MTYPE)
 void send_synack_to_workers(int msqid, int num_workers) {
-    
+    printf("Sending SYNACK to workers\n");
+    msgbuf_t msg;
+    msg.mtype = BROADCAST_MTYPE;
+    snprintf(msg.mtext, MESSAGE_SIZE, "SYNACK");
+    for (int i = 0; i < num_workers; i++) {
+        if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
+            perror("Failed to send message to worker");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 
@@ -87,7 +118,37 @@ void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
             //       Messages will have the format ("%s %d %d", executable_path, parameter, status)
             //       so consider using sscanf() to parse the message.
             while (1) {
-                
+                msgbuf_t msg;
+                if (msgrcv(msqid, &msg, sizeof(msg), i + 1, msgflg) == -1) {
+                    if (errno == ENOMSG) {
+                        break;
+                    }
+                    perror("Failed to receive message from worker");
+                    exit(1);
+                }
+
+                if (strcmp(msg.mtext, "DONE") == 0) {
+                    worker_done[i] = 1;
+                    break;
+                }
+
+                char exe_path[MESSAGE_SIZE];
+                int param, status;
+                sscanf(msg.mtext, "%s %d %d", exe_path, &param, &status);
+                printf("Received: %s %d %d\n", exe_path, param, status);
+                for (int j = 0; j < num_executables; j++) {
+                    if (strcmp(results[j].exe_path, exe_path) == 0) {
+                        for (int k = 0; k < total_params; k++) {
+                            if (results[j].params_tested[k] == param) {
+                                results[j].status[k] = status;
+                                printf("Stored: %s %d %d\n", exe_path, param, status);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                received++;
             }
         }
     }
@@ -112,6 +173,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_executables; i++) {
         results[i].exe_path = executable_paths[i];
         results[i].params_tested = malloc((total_params) * sizeof(int));
+        for (int j = 0; j < total_params; j++) {
+            results[i].params_tested[j] = atoi(argv[j + 2]);
+        }
         results[i].status = malloc((total_params) * sizeof(int));
     }
 
@@ -126,7 +190,7 @@ int main(int argc, char *argv[]) {
     key_t key = IPC_PRIVATE;
 
     // TODO: Create a message queue
-    int msqid;
+    int msqid = msgget(key, 0666 | IPC_CREAT);
 
     int num_pairs_to_test = num_executables * total_params;
     
@@ -147,7 +211,12 @@ int main(int argc, char *argv[]) {
             long worker_id = sent % num_workers + 1;
             
             // TODO: Send (executable, parameter) pair to worker via message queue (mtype = worker_id)
-
+            msg.mtype = worker_id;
+            snprintf(msg.mtext, MESSAGE_SIZE, "%s %s", executable_paths[j], argv[i + 2]);
+            if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
+                perror("Failed to send message to worker");
+                exit(EXIT_FAILURE);
+            }
             sent++;
         }
     }
@@ -161,8 +230,18 @@ int main(int argc, char *argv[]) {
     // TODO: Wait for all workers to finish and collect their results from message queue
     wait_for_workers(msqid, num_pairs_to_test, argv + 2);
 
-    // TODO: Remove ALL output files (output/<executable>.<input>)
 
+    // TODO: Remove ALL output files (output/<executable>.<input>)
+    for (int i = 0; i < num_executables; i++) {
+        for (int j = 0; j < total_params; j++) {
+            char output_path[PATH_MAX];
+            snprintf(output_path, MESSAGE_SIZE, "output/%s.%s", get_exe_name(results[i].exe_path), argv[j + 2]);
+            if (unlink(output_path) == -1) {
+                perror("Failed to remove output file");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
 
     write_results_to_file(results, num_executables, total_params);
 
@@ -173,7 +252,10 @@ int main(int argc, char *argv[]) {
     write_scores_to_file(results, num_executables, "results.txt");
 
     // TODO: Remove the message queue
-
+    if (msgctl(msqid, IPC_RMID, NULL) == -1) {
+        perror("Failed to remove message queue");
+        exit(1);
+    }
 
     // Free the results struct and its fields
     for (int i = 0; i < num_executables; i++) {

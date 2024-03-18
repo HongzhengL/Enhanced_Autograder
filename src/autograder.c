@@ -180,8 +180,11 @@ void monitor_and_evaluate_solutions(int tested, char *param, int param_idx) {
         if (signaled) {
             if (WTERMSIG(status) == SIGSEGV) {
                 final_status = SEGFAULT;
-            } else {
+            } else if (WTERMSIG(status) == SIGKILL) {
                 final_status = STUCK_OR_INFINITE;
+            } else {
+                perror("Unrecognized signal");
+                exit(EXIT_FAILURE);
             }
         } else if (exited) {
             char *executable_name = get_exe_name(results[tested - curr_batch_size + j].exe_path);

@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
         }
 
     #elif MQUEUE
-        // TODO
+        param = atoi(argv[1]);
 
     #endif
 

@@ -184,7 +184,7 @@ void start_timer(int seconds, void (*timeout_handler)(int)) {
 
     interval.it_interval.tv_sec = 0;
     interval.it_interval.tv_usec = 0;
-    interval.it_value.tv_sec = TIMEOUT_SECS;
+    interval.it_value.tv_sec = seconds;
     interval.it_value.tv_usec = 0;
 
     if (setitimer(ITIMER_REAL, &interval, NULL) == -1) {
