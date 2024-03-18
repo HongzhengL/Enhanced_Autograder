@@ -35,4 +35,12 @@ To clean the build, type:
 > make clean
 ```
 
-### Created by: Hongzheng Li (li003458) & Elias Vera-Jimenez (veraj002), Group 44 ###
+### Any assumptions outside this document
+
+None
+
+### Team id, team member names and x500's
+
+- Group 44
+- Elias Vera-Jimenez (veraj002)
+- Hongzheng Li (li003458)
