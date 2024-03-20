@@ -109,8 +109,9 @@ test-pipe:
 
 test-all: test-exec test-redir test-pipe
 
-test-mq-autograder: mq_autograder test-setup
-	@./testius test_cases/mq_tests.json -v
+test-mq-autograder:
+	@make clean clean-tests mqueue
+	@./testius test_cases/mq.json -v
 
 .NOTPARALLEL: exec redir pipe test-setup
 

@@ -181,9 +181,10 @@ void monitor_and_evaluate_solutions(int finished) {
 // Send results for the current batch back to the autograder
 void send_results(int msqid, long mtype, int finished) {
     // Format of message should be ("%s %d %d", executable_path, parameter, status)
+    msgbuf_t msg;
+    memset(&msg, 0, sizeof(msgbuf_t));
+    msg.mtype = mtype;
     for (int i = 0; i < curr_batch_size; ++i) {
-        msgbuf_t msg;
-        msg.mtype = mtype;
         snprintf(msg.mtext, MESSAGE_SIZE, "%s %d %d", pairs[finished + i].executable_path, pairs[finished + i].parameter, pairs[finished + i].status);
         if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
             perror("Failed to send results to autograder");
@@ -196,6 +197,7 @@ void send_results(int msqid, long mtype, int finished) {
 // Send DONE message to autograder to indicate that the worker has finished testing
 void send_done_msg(int msqid, long mtype) {
     msgbuf_t msg;
+    memset(&msg, 0, sizeof(msgbuf_t));
     msg.mtype = mtype;
     snprintf(msg.mtext, MESSAGE_SIZE, "DONE");
     printf("Worker %ld sending DONE\n", mtype);
@@ -219,6 +221,7 @@ int main(int argc, char **argv) {
     // TODO: Receive initial message from autograder specifying the number of (executable, parameter) 
     // pairs that the worker will test (should just be an integer in the message body). (mtype = worker_id)
     msgbuf_t msg;
+    memset(&msg, 0, sizeof(msgbuf_t));
     if (msgrcv(msqid, &msg, sizeof(msg), worker_id, 0) == -1) {
         perror("Failed to receive message from autograder");
         exit(EXIT_FAILURE);

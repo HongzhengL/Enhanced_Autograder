@@ -32,6 +32,7 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
     else if (pid > 0) {
         // TODO: Send the total number of pairs to worker via message queue (mtype = worker_id)
         msgbuf_t msg;
+        memset(&msg, 0, sizeof(msgbuf_t));
         msg.mtype = worker_id;
         snprintf(msg.mtext, MESSAGE_SIZE, "%d", pairs_per_worker);
         if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
@@ -55,6 +56,7 @@ void receive_ack_from_workers(int msqid, int num_workers) {
     int received = 0;
     while (received < num_workers) {
         msgbuf_t msg;
+        memset(&msg, 0, sizeof(msgbuf_t));
         if (msgrcv(msqid, &msg, sizeof(msg), BROADCAST_MTYPE + 1, 0) == -1) {
             perror("Failed to receive message from worker");
             exit(EXIT_FAILURE);
@@ -71,10 +73,11 @@ void receive_ack_from_workers(int msqid, int num_workers) {
 // TODO: Send SYNACK to all workers using message queue (mtype = BROADCAST_MTYPE)
 void send_synack_to_workers(int msqid, int num_workers) {
     printf("Sending SYNACK to workers\n");
-    msgbuf_t msg;
-    msg.mtype = BROADCAST_MTYPE;
-    snprintf(msg.mtext, MESSAGE_SIZE, "SYNACK");
     for (int i = 0; i < num_workers; i++) {
+        msgbuf_t msg;
+        memset(&msg, 0, sizeof(msgbuf_t));
+        msg.mtype = BROADCAST_MTYPE;
+        snprintf(msg.mtext, MESSAGE_SIZE, "SYNACK");
         if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
             perror("Failed to send message to worker");
             exit(EXIT_FAILURE);
@@ -119,6 +122,7 @@ void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
             //       so consider using sscanf() to parse the message.
             while (1) {
                 msgbuf_t msg;
+                memset(&msg, 0, sizeof(msgbuf_t));
                 if (msgrcv(msqid, &msg, sizeof(msg), i + 1, msgflg) == -1) {
                     if (errno == ENOMSG) {
                         break;
@@ -208,6 +212,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < total_params; i++) {
         for (int j = 0; j < num_executables; j++) {
             msgbuf_t msg;
+            memset(&msg, 0, sizeof(msgbuf_t));
             long worker_id = sent % num_workers + 1;
             
             // TODO: Send (executable, parameter) pair to worker via message queue (mtype = worker_id)
