@@ -84,7 +84,7 @@ test-setup:
 	rm -rf test_results/*
 
 clean-tests:
-	rm -rf autograder test_results
+	rm -rf autograder test_results results.txt scores.txt
 
 ifdef testnum
 test-simple: clean-tests exec test-setup

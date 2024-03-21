@@ -45,7 +45,7 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
         // TODO: Redirect STDOUT to output/<executable>.<input> file
         int path_len = strlen("output/") + strlen(executable_name) + MAX_INT_CHARS + 2;
         // int path_len = PATH_MAX;
-        char *output_file = malloc(path_len);
+        char *output_file = (char *) malloc(path_len);
         if (output_file == NULL) {
             fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
@@ -70,7 +70,7 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
         snprintf(param_str, MAX_INT_CHARS, "%d", param);
         execl(executable_path, executable_name, param_str, NULL);
         perror("Failed to execute program in worker");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     // Parent process
     else if (pid > 0) {
@@ -87,7 +87,7 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
 // Wait for the batch to finish and check results
 void monitor_and_evaluate_solutions(int finished) {
     // Keep track of finished processes for alarm handler
-    child_status = malloc(curr_batch_size * sizeof(int));
+    child_status = (int *) malloc(curr_batch_size * sizeof(int));
     if (child_status == NULL) {
         fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
         exit(EXIT_FAILURE);
@@ -114,7 +114,6 @@ void monitor_and_evaluate_solutions(int finished) {
             }
         } while (pid == -1 && errno == EINTR);
 
-        // int exit_status = WEXITSTATUS(status);
         int exited = WIFEXITED(status);
         int signaled = WIFSIGNALED(status);
 
@@ -133,7 +132,7 @@ void monitor_and_evaluate_solutions(int finished) {
         } else if (exited) {
             char *executable_name = get_exe_name(current_exe_path);
             int length_output_path = strlen("output/") + strlen(executable_name) + MAX_INT_CHARS + 2;  // +2 for the null terminator and the dot
-            char *output_path = malloc(length_output_path);    // +2 for the null terminator and the dot
+            char *output_path =  (char *) malloc(length_output_path);    // +2 for the null terminator and the dot
             if (output_path == NULL) {
                 fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
                 exit(EXIT_FAILURE);
@@ -169,7 +168,7 @@ void monitor_and_evaluate_solutions(int finished) {
             }
         }
         pairs[finished + j].status = final_status;
-        // printf("final_status: %d\n", final_status);
+
         // Mark the process as finished
         child_status[j] = -1;
     }
@@ -229,13 +228,13 @@ int main(int argc, char **argv) {
 
     // TODO: Parse message and set up pairs_t array
     int pairs_to_test = atoi(msg.mtext);
-    pairs = malloc(pairs_to_test * sizeof(pairs_t));
+    pairs = (pairs_t *) malloc(pairs_to_test * sizeof(pairs_t));
     if (pairs == NULL) {
         fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
         exit(EXIT_FAILURE);
     }
     for (int i = 0; i < pairs_to_test; i++) {
-        pairs[i].executable_path = malloc(PATH_MAX);
+        pairs[i].executable_path = (char *) malloc(PATH_MAX);
         if (pairs[i].executable_path == NULL) {
             fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
@@ -287,7 +286,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < pairs_to_test; i+= PAIRS_BATCH_SIZE) {
         int remaining = pairs_to_test - i;
         curr_batch_size = remaining < PAIRS_BATCH_SIZE ? remaining : PAIRS_BATCH_SIZE;
-        pids = malloc(curr_batch_size * sizeof(pid_t));
+        pids = (pid_t *) malloc(curr_batch_size * sizeof(pid_t));
 
         for (int j = 0; j < curr_batch_size; j++) {
             // TODO: Execute the student executable

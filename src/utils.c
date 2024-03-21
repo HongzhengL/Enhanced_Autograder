@@ -148,7 +148,7 @@ int get_batch_size() {
 void create_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
-        char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        char *input_file = (char *) malloc(len_input_file);  // +1 for the null terminator
         if (input_file == NULL) {
             fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
@@ -213,7 +213,7 @@ void cancel_timer() {
 void remove_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
-        char *input_file = malloc(len_input_file);  // +1 for the null terminator
+        char *input_file = (char *) malloc(len_input_file);  // +1 for the null terminator
         if (input_file == NULL) {
             fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
@@ -234,7 +234,7 @@ void remove_output_files(autograder_results_t *results, int tested, int current_
     for (int i = 0; i < current_batch_size; ++i) {
         char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
         size_t len_output_file = strlen("output/") + strlen(exe_name) + strlen(param) + 2;  // +1 for the null terminator
-        char *output_file = malloc(len_output_file);
+        char *output_file = (char *) malloc(len_output_file);
         if (output_file == NULL) {
             fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);

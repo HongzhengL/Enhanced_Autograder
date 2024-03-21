@@ -89,7 +89,11 @@ void send_synack_to_workers(int msqid, int num_workers) {
 // Wait for all workers to finish and collect their results from message queue
 void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
     int received = 0;
-    worker_done = malloc(num_workers * sizeof(int));
+    worker_done = (int *) malloc(num_workers * sizeof(int));
+    if (worker_done == NULL) {
+        fprintf(stderr, "Error occurred at line %d in %s: malloc failed\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < num_workers; i++) {
         worker_done[i] = 0;
     }
@@ -173,14 +177,26 @@ int main(int argc, char *argv[]) {
     char **executable_paths = get_student_executables(testdir, &num_executables);
 
     // Construct summary struct
-    results = malloc(num_executables * sizeof(autograder_results_t));
+    results = (autograder_results_t *) malloc(num_executables * sizeof(autograder_results_t));
+    if (results == NULL) {
+        fprintf(stderr, "Error occurred at line %d in %s: malloc failed\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < num_executables; i++) {
         results[i].exe_path = executable_paths[i];
-        results[i].params_tested = malloc((total_params) * sizeof(int));
+        results[i].params_tested = (int *) malloc((total_params) * sizeof(int));
+        if (results[i].params_tested == NULL) {
+            fprintf(stderr, "Error occurred at line %d in file %s: malloc failed\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
         for (int j = 0; j < total_params; j++) {
             results[i].params_tested[j] = atoi(argv[j + 2]);
         }
-        results[i].status = malloc((total_params) * sizeof(int));
+        results[i].status = (int *) malloc((total_params) * sizeof(int));
+        if (results[i].status == NULL) {
+            fprintf(stderr, "Error occurred at line %d in file %s: malloc failed\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
     }
 
     num_workers = get_batch_size();
@@ -188,7 +204,11 @@ int main(int argc, char *argv[]) {
     if (num_workers > num_executables * total_params) {
         num_workers = num_executables * total_params;
     }
-    workers = malloc(num_workers * sizeof(pid_t));
+    workers = (pid_t *) malloc(num_workers * sizeof(pid_t));
+    if (workers == NULL) {
+        fprintf(stderr, "Error occurred at line %d in %s: malloc failed\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
 
     // Create a unique key for message queue
     key_t key = IPC_PRIVATE;

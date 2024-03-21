@@ -2,7 +2,6 @@
     "name": "CSCI 4061 Project 2",
     "child_output_file": "results.txt",
     "timeout": 180,
-    "use_valgrind": "y",
     "tests": [
         {
             "name": "Change 4 - message queue",

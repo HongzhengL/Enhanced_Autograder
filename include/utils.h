@@ -19,7 +19,7 @@
 #include <sys/msg.h>
 
 
-#define TIMEOUT_SECS 3    // Timeout threshold for stuck/infinite loop
+#define TIMEOUT_SECS 10    // Timeout threshold for stuck/infinite loop
 #define MAX_INT_CHARS 10 // Maximum number of characters in an integer
 
 /************************* ONLY FOR MESSAGE QUEUES *************************/
@@ -27,7 +27,7 @@
 #define BROADCAST_MTYPE 4061  
 
 // Size of message queue message -> max size of executable path sent/received
-#define MESSAGE_SIZE 128
+#define MESSAGE_SIZE 100
 /************************* ONLY FOR MESSAGE QUEUES *************************/
 
 // Main struct for storing the results of the autograder
