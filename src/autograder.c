@@ -114,6 +114,10 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
                 fprintf(stderr, "Error occured at line %d: dup2 failed", __LINE__ - 1);
                 exit(EXIT_FAILURE);
             }
+            if (close(STDIN_FILENO) == -1) {
+                fprintf(stderr, "Error occured at line %d: close failed", __LINE__ - 1);
+                exit(EXIT_FAILURE);
+            }
             char string_of_pipefd[MAX_INT_CHARS + 1];
             snprintf(string_of_pipefd, sizeof(string_of_pipefd), "%d", pipefd[0]);
             execl(executable_path, executable_name, string_of_pipefd, NULL);
