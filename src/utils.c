@@ -315,12 +315,40 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
     fclose(file);
 }
 
+size_t line_length(FILE *file) {
+    char *line = NULL;
+    size_t len = 0;
+    getline(&line, &len, file);
+    rewind(file);
+    free(line);
+    return len;
+}
 
 // TODO: Implement this function
-double get_score(char *result_line) {
+double get_score(char *results_file, char *executable_name) {
+    FILE *file = fopen(results_file, "r");
+    if (!file) {
+        fprintf(stderr, "Error occurred at line %d in %s: Failed to open file\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
+    char *exe_name = get_exe_name(executable_name);
+    size_t len = line_length(file);
+    char line[len + 1];
+    int pos = 0;
+    while (fgets(line, sizeof(line), file)){
+        if (strncmp(line, exe_name, strlen(exe_name)) == 0 && !isdigit(line[sizeof(exe_name)])) {
+            pos = ftell(file) - strlen(line);
+            break;
+        }
+    }
+    if (pos != 0) {
+        fseek(file, pos, SEEK_SET);
+        fgets(line, sizeof(line), file);
+    }
+    printf("%d\n", pos);
     int correct = 0;
     int total = 0;
-    char *token = strstr(result_line, "(");
+    char *token = strstr(line, "(");
     while (token != NULL) {
         char result[ALIGNMENT + 1];     // +1 for the null terminator
         strncpy(result, token + 1, ALIGNMENT);
@@ -331,18 +359,14 @@ double get_score(char *result_line) {
         ++total;
         token = strstr(token + 1, "(");
     }
+    fclose(file);
     return (double) correct / total * 1.0;
 }
 
 
 void write_scores_to_file(autograder_results_t *results, int num_executables, char *results_file) {
-    FILE *file = fopen(results_file, "r");
     for (int i = 0; i < num_executables; i++) {
-        char *line = NULL;
-        size_t len = 0;
-        getline(&line, &len, file);
-        double student_score = get_score(line);
-
+        double student_score = get_score(results_file, results[i].exe_path);
         char *student_exe = get_exe_name(results[i].exe_path);
 
         char score_file[] = "scores.txt";
@@ -361,12 +385,10 @@ void write_scores_to_file(autograder_results_t *results, int num_executables, ch
         int longest_len = get_longest_len_executable(results, num_executables);
 
         char format[20];
-        snprintf(format, sizeof(format), "%%-%ds: ", longest_len);
+        sprintf(format, "%%-%ds: ", longest_len);
         fprintf(score_fp, format, student_exe);
         fprintf(score_fp, "%5.3f\n", student_score);
 
         fclose(score_fp);
-        free(line);
     }
-    fclose(file);
 }
