@@ -345,7 +345,6 @@ double get_score(char *results_file, char *executable_name) {
         fseek(file, pos, SEEK_SET);
         fgets(line, sizeof(line), file);
     }
-    printf("%d\n", pos);
     int correct = 0;
     int total = 0;
     char *token = strstr(line, "(");

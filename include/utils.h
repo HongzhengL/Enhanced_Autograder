@@ -20,7 +20,7 @@
 #include <ctype.h> // For isdigit()
 
 
-#define TIMEOUT_SECS 3    // Timeout threshold for stuck/infinite loop
+#define TIMEOUT_SECS 10    // Timeout threshold for stuck/infinite loop
 #define MAX_INT_CHARS 10 // Maximum number of characters in an integer
 
 /************************* ONLY FOR MESSAGE QUEUES *************************/
