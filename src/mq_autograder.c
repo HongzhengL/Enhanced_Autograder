@@ -118,18 +118,20 @@ void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
                 msgbuf_t msg;
                 memset(&msg, 0, sizeof(msgbuf_t));
                 if (msgrcv(msqid, &msg, sizeof(msg), i + 1, msgflg) == -1) {
-                    if (errno == ENOMSG) {
+                    if (errno == ENOMSG) {  // No message, break
                         break;
                     }
                     perror("Failed to receive message from worker");
                     exit(1);
                 }
 
+                // if `DONE`, set worker_done[i] to 1 and break
                 if (strcmp(msg.mtext, "DONE") == 0) {
                     worker_done[i] = 1;
                     break;
                 }
 
+                // parse message
                 char exe_path[MESSAGE_SIZE];
                 int param, status;
                 sscanf(msg.mtext, "%s %d %d", exe_path, &param, &status);
@@ -202,7 +204,11 @@ int main(int argc, char *argv[]) {
     key_t key = IPC_PRIVATE;
 
     // TODO: Create a message queue
-    int msqid = msgget(key, 0666 | IPC_CREAT);
+    int msqid;
+    if ((msqid = msgget(key, 0666 | IPC_CREAT)) == -1) {
+        perror("Failed to create message queue");
+        exit(EXIT_FAILURE);
+    }
 
     int num_pairs_to_test = num_executables * total_params;
 
