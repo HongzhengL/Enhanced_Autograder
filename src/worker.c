@@ -199,7 +199,6 @@ void send_done_msg(int msqid, long mtype) {
     memset(&msg, 0, sizeof(msgbuf_t));
     msg.mtype = mtype;
     snprintf(msg.mtext, MESSAGE_SIZE, "DONE");
-    printf("Worker %ld sending DONE\n", mtype);
     if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
         perror("Failed to send DONE message to autograder");
         exit(EXIT_FAILURE);
@@ -215,7 +214,6 @@ int main(int argc, char **argv) {
 
     int msqid = atoi(argv[1]);
     worker_id = atoi(argv[2]);
-    printf("Worker %ld started\n", worker_id);
 
     // TODO: Receive initial message from autograder specifying the number of (executable, parameter)
     // pairs that the worker will test (should just be an integer in the message body). (mtype = worker_id)
@@ -253,23 +251,18 @@ int main(int argc, char **argv) {
         strcpy(pairs[i].executable_path, executable_path);
         // pairs[i].executable_path = executable_path;
         pairs[i].parameter = parameter;
-        printf("Worker %ld received: %s %d i: %d\n", worker_id, pairs[i].executable_path, pairs[i].parameter, i);
     }
 
     // TODO: Send ACK message to mq_autograder after all pairs received (mtype = BROADCAST_MTYPE)
     msg.mtype = BROADCAST_MTYPE + 1;
     snprintf(msg.mtext, MESSAGE_SIZE, "ACK");
-    printf("Sending ACK to autograder\n");
-    printf("Worker %ld sending ACK\n", worker_id);
     if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
         perror("Failed to send message to autograder");
         exit(EXIT_FAILURE);
     }
-    printf("Pairs[%d].executable_path: %s\n", 0, pairs[0].executable_path);
     // TODO: Wait for SYNACK from autograder to start testing (mtype = BROADCAST_MTYPE).
     //       Be careful to account for the possibility of receiving ACK messages just sent.
     int received = 0;
-    printf("Waiting for SYNACK\n");
     while (received < 1) {
         if (msgrcv(msqid, &msg, sizeof(msg), BROADCAST_MTYPE, 0) == -1) {
             perror("Failed to receive message from autograder");
@@ -278,10 +271,7 @@ int main(int argc, char **argv) {
         if (strcmp(msg.mtext, "SYNACK") == 0) {
             received++;
         }
-        printf("msg.mtext: %s\n", msg.mtext);
-        printf("worker %ld received: %d / 1\n", worker_id, received);
     }
-    printf("Received SYNACK\n");
     // Run the pairs in batches of 8 and send results back to autograder
     for (int i = 0; i < pairs_to_test; i+= PAIRS_BATCH_SIZE) {
         int remaining = pairs_to_test - i;
@@ -290,12 +280,8 @@ int main(int argc, char **argv) {
 
         for (int j = 0; j < curr_batch_size; j++) {
             // TODO: Execute the student executable
-            printf("i + j: %d\n", i + j);
-            printf("executable_path: %s\n", pairs[i + j].executable_path);
-            printf("parameter: %d\n", pairs[i + j].parameter);
             execute_solution(pairs[i + j].executable_path, pairs[i + j].parameter, j);
         }
-        printf("Executed batch %d\n", i);
         // TODO: Setup timer to determine if child process is stuck
         start_timer(TIMEOUT_SECS, timeout_handler);  // Implement this function (src/utils.c)
 

@@ -46,7 +46,6 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
 
 // TODO: Receive ACK from all workers using message queue (mtype = BROADCAST_MTYPE)
 void receive_ack_from_workers(int msqid, int num_workers) {
-    printf("Waiting for ACK from workers\n");
     int received = 0;
     while (received < num_workers) {
         msgbuf_t msg;
@@ -55,18 +54,15 @@ void receive_ack_from_workers(int msqid, int num_workers) {
             perror("Failed to receive message from worker");
             exit(EXIT_FAILURE);
         }
-        printf("Received: %s\n", msg.mtext);
         if (strcmp(msg.mtext, "ACK") == 0) {
             received++;
         }
-        printf("received: %d / %d\n", received, num_workers);
     }
 }
 
 
 // TODO: Send SYNACK to all workers using message queue (mtype = BROADCAST_MTYPE)
 void send_synack_to_workers(int msqid, int num_workers) {
-    printf("Sending SYNACK to workers\n");
     for (int i = 0; i < num_workers; i++) {
         msgbuf_t msg;
         memset(&msg, 0, sizeof(msgbuf_t));
@@ -137,13 +133,11 @@ void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
                 char exe_path[MESSAGE_SIZE];
                 int param, status;
                 sscanf(msg.mtext, "%s %d %d", exe_path, &param, &status);
-                printf("Received: %s %d %d\n", exe_path, param, status);
                 for (int j = 0; j < num_executables; j++) {
                     if (strcmp(results[j].exe_path, exe_path) == 0) {
                         for (int k = 0; k < total_params; k++) {
                             if (results[j].params_tested[k] == param) {
                                 results[j].status[k] = status;
-                                printf("Stored: %s %d %d\n", exe_path, param, status);
                                 break;
                             }
                         }
