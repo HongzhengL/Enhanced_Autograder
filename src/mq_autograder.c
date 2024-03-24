@@ -12,12 +12,10 @@ int num_workers;          // Number of workers to spawn
 
 
 void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
-    
     pid_t pid = fork();
 
     // Child process
     if (pid == 0) {
-
         // TODO: exec() the worker program and pass it the message queue id and worker id.
         //       Use ./worker as the path to the worker program.
         char msqid_str[MAX_INT_CHARS + 1];
@@ -27,9 +25,7 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
         execl("./worker", "worker", msqid_str, worker_id_str, NULL);
         perror("Failed to spawn worker");
         exit(1);
-    }
-    // Parent process
-    else if (pid > 0) {
+    } else if (pid > 0) {  // Parent process
         // TODO: Send the total number of pairs to worker via message queue (mtype = worker_id)
         msgbuf_t msg;
         memset(&msg, 0, sizeof(msgbuf_t));
@@ -41,9 +37,7 @@ void launch_worker(int msqid, int pairs_per_worker, int worker_id) {
         }
         // Store the worker's pid for monitoring
         workers[worker_id - 1] = pid;
-    }
-    // Fork failed 
-    else {
+    } else {  // Fork failed
         perror("Failed to fork worker");
         exit(1);
     }
@@ -106,7 +100,7 @@ void wait_for_workers(int msqid, int pairs_to_test, char **argv_params) {
 
             // Check if worker has finished
             pid_t retpid = waitpid(workers[i], NULL, WNOHANG);
-            
+
             int msgflg;
             if (retpid > 0)
                 // Worker has finished and still has messages to receive
@@ -217,7 +211,7 @@ int main(int argc, char *argv[]) {
     int msqid = msgget(key, 0666 | IPC_CREAT);
 
     int num_pairs_to_test = num_executables * total_params;
-    
+
     // Spawn workers and send them the total number of (executable, parameter) pairs they will test
     for (int i = 0; i < num_workers; i++) {
         int leftover = num_pairs_to_test % num_workers - i > 0 ? 1 : 0;
@@ -234,7 +228,7 @@ int main(int argc, char *argv[]) {
             msgbuf_t msg;
             memset(&msg, 0, sizeof(msgbuf_t));
             long worker_id = sent % num_workers + 1;
-            
+
             // TODO: Send (executable, parameter) pair to worker via message queue (mtype = worker_id)
             msg.mtype = worker_id;
             snprintf(msg.mtext, MESSAGE_SIZE, "%s %s", executable_paths[j], argv[i + 2]);
@@ -292,6 +286,6 @@ int main(int argc, char *argv[]) {
     free(results);
     free(executable_paths);
     free(workers);
-    
+
     return 0;
 }

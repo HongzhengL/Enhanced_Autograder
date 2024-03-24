@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     int seed = 0;
 
     for (int i = 0; argv[0][i] != '\0'; i++) {
-        seed += (unsigned char)argv[0][i]; 
+        seed += (unsigned char)argv[0][i];
     }
 
     unsigned int param = 0;
@@ -36,11 +36,11 @@ int main(int argc, char *argv[]) {
 
     #elif REDIR
         scanf("%u", &param);
-        
+
     #elif PIPE
         int pipefd = atoi(argv[1]);
         char buffer[BUFSIZ];
-        if (read(pipefd, buffer, BUFSIZ) == -1) { 
+        if (read(pipefd, buffer, BUFSIZ) == -1) {
             perror("Read failed");
             exit(EXIT_FAILURE);
         }
@@ -57,12 +57,12 @@ int main(int argc, char *argv[]) {
 
     seed += param;
     srandom(seed);
-  
-    int mode = random() % 5 + 1;
-    pid_t pid = getpid(); 
 
-    sleep(1); 
-    
+    int mode = random() % 5 + 1;
+    pid_t pid = getpid();
+
+    sleep(1);
+
     switch (mode) {
         case 1:
             // Using fprintf(stderr, ...) since STDOUT is redirected to a file
@@ -93,6 +93,6 @@ int main(int argc, char *argv[]) {
         default:
             break;
     }
-    
+
     return 0;
 }

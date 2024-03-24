@@ -75,7 +75,7 @@ void execute_solution(char *executable_path, char *input, int batch_idx) {
         #ifdef EXEC
 
             execl(executable_path, executable_name, input, NULL);
-            
+
         #elif REDIR
 
             // TODO: Redirect STDIN to input/<input>.in file

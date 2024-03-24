@@ -1,6 +1,6 @@
 #include "utils.h"
 
-// Run the (executable, parameter) pairs in batches of 8 to avoid timeouts due to 
+// Run the (executable, parameter) pairs in batches of 8 to avoid timeouts due to
 // having too many child processes running at once
 #define PAIRS_BATCH_SIZE 8
 
@@ -117,10 +117,10 @@ void monitor_and_evaluate_solutions(int finished) {
         int exited = WIFEXITED(status);
         int signaled = WIFSIGNALED(status);
 
-        // TODO: Check if the process finished normally, segfaulted, or timed out and update the 
-        //       pairs array with the results. Use the macros defined in the enum in utils.h for 
+        // TODO: Check if the process finished normally, segfaulted, or timed out and update the
+        //       pairs array with the results. Use the macros defined in the enum in utils.h for
         //       the status field of the pairs_t struct (e.g. CORRECT, INCORRECT, SEGFAULT, etc.)
-        //       This should be the same as the evaluation in autograder.c, just updating `pairs` 
+        //       This should be the same as the evaluation in autograder.c, just updating `pairs`
         //       instead of `results`.
         int final_status;
         if (signaled) {
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     worker_id = atoi(argv[2]);
     printf("Worker %ld started\n", worker_id);
 
-    // TODO: Receive initial message from autograder specifying the number of (executable, parameter) 
+    // TODO: Receive initial message from autograder specifying the number of (executable, parameter)
     // pairs that the worker will test (should just be an integer in the message body). (mtype = worker_id)
     msgbuf_t msg;
     memset(&msg, 0, sizeof(msgbuf_t));
@@ -321,5 +321,4 @@ int main(int argc, char **argv) {
         free(pairs[i].executable_path);
     }
     free(pairs);
-
 }
