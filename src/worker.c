@@ -54,7 +54,7 @@ void execute_solution(char *executable_path, int param, int batch_idx) {
         int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         free(output_file);
         if (fd == -1) {
-            fprintf(stderr, "Error occured at line %d: malloc failed\n", __LINE__ - 3);
+            fprintf(stderr, "Error occured at line %d: open failed\n", __LINE__ - 3);
             exit(EXIT_FAILURE);
         }
         if (dup2(fd, STDOUT_FILENO) == -1) {
@@ -123,13 +123,13 @@ void monitor_and_evaluate_solutions(int finished) {
         //       This should be the same as the evaluation in autograder.c, just updating `pairs`
         //       instead of `results`.
         int final_status;
-        if (signaled) {
+        if (signaled) {  // if terminated by a signal, check signal type
             if (WTERMSIG(status) == SIGSEGV) {
                 final_status = SEGFAULT;
             } else {
                 final_status = STUCK_OR_INFINITE;
             }
-        } else if (exited) {
+        } else if (exited) {    // if exited normally, check output file
             char *executable_name = get_exe_name(current_exe_path);
             int length_output_path = strlen("output/") + strlen(executable_name) + MAX_INT_CHARS + 2;  // +2 for the null terminator and the dot
             char *output_path =  (char *) malloc(length_output_path);    // +2 for the null terminator and the dot
@@ -167,6 +167,7 @@ void monitor_and_evaluate_solutions(int finished) {
                 exit(EXIT_FAILURE);
             }
         }
+        // Update the status of the current pair
         pairs[finished + j].status = final_status;
 
         // Mark the process as finished
@@ -249,7 +250,6 @@ int main(int argc, char **argv) {
         char *executable_path = strtok(msg.mtext, " ");
         int parameter = atoi(strtok(NULL, " "));
         strcpy(pairs[i].executable_path, executable_path);
-        // pairs[i].executable_path = executable_path;
         pairs[i].parameter = parameter;
     }
 

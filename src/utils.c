@@ -1,6 +1,7 @@
 #include "utils.h"
 
-#define ALIGNMENT 9     // Number of characters to align the status messages
+#define ALIGNMENT 9     // Number of characters to align the status messages,
+                        // taken from the write_results_to_file function
 
 const char* get_status_message(int status) {
     switch (status) {
@@ -98,7 +99,7 @@ int get_batch_size() {
 
     pid_t pid = fork();
 
-    if (pid == 0) {  // child process
+    if (pid == 0) {  // child process will check the number of processors in /proc/cpuinfo
         if (close(pipe_fd[0]) == -1) {  // Closing read end, won't need it.
             fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
             exit(EXIT_FAILURE);
@@ -126,6 +127,7 @@ int get_batch_size() {
             exit(EXIT_FAILURE);
         }
 
+        // Safely wait for child process to finish
         pid_t wait_result;
         do {
             wait_result = wait(NULL);
@@ -147,8 +149,9 @@ int get_batch_size() {
 // TODO: Implement this function
 void create_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
+        // use snprintf to create the path name of the input file
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
-        char *input_file = (char *) malloc(len_input_file);  // +1 for the null terminator
+        char *input_file = (char *) malloc(len_input_file);
         if (input_file == NULL) {
             fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
             exit(EXIT_FAILURE);
@@ -159,6 +162,7 @@ void create_input_files(char **argv_params, int num_parameters) {
             perror("Failed to open file");
             exit(EXIT_FAILURE);
         }
+        // write the parameter to the input file
         fprintf(file, "%s", argv_params[i]);
         fclose(file);
         free(input_file);
@@ -199,7 +203,7 @@ void cancel_timer() {
     struct itimerval interval;
     interval.it_interval.tv_sec = 0;
     interval.it_interval.tv_usec = 0;
-    interval.it_value.tv_sec = 0;  // Stopping Timer.
+    interval.it_value.tv_sec = 0;  // Stopping Timer
     interval.it_value.tv_usec = 0;
 
     if (setitimer(ITIMER_REAL, &interval, 0)) {
@@ -212,6 +216,7 @@ void cancel_timer() {
 // TODO: Implement this function
 void remove_input_files(char **argv_params, int num_parameters) {
     for (int i = 0; i < num_parameters; ++i) {
+        // use snprintf to create the path name of the input file, then unlink the file
         size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
         char *input_file = (char *) malloc(len_input_file);  // +1 for the null terminator
         if (input_file == NULL) {
@@ -232,6 +237,7 @@ void remove_input_files(char **argv_params, int num_parameters) {
 // TODO: Implement this function
 void remove_output_files(autograder_results_t *results, int tested, int current_batch_size, char *param) {
     for (int i = 0; i < current_batch_size; ++i) {
+        // use snprintf to create the path name of the output file, then unlink the file
         char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
         size_t len_output_file = strlen("output/") + strlen(exe_name) + strlen(param) + 2;  // +1 for the null terminator
         char *output_file = (char *) malloc(len_output_file);
@@ -316,42 +322,58 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
 }
 
 size_t line_length(FILE *file) {
-    char *line = NULL;
+    // get the length of the first line
+    char line[BUFSIZ];
     size_t len = 0;
-    getline(&line, &len, file);
-    rewind(file);
-    free(line);
+    fgets(line, sizeof(line), file);
+    for (len = 0; line[len] != '\n'; ++len);
+    if (fseek(file, 0, SEEK_SET) == -1) {
+        fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);\
+        exit(EXIT_FAILURE);
+    }
     return len;
 }
 
 // TODO: Implement this function
 double get_score(char *results_file, char *executable_name) {
+    // use fseek to find the position of the executable in the file
     FILE *file = fopen(results_file, "r");
     if (!file) {
         fprintf(stderr, "Error occurred at line %d in %s: Failed to open file\n", __LINE__, __FILE__);
         exit(EXIT_FAILURE);
     }
     char *exe_name = get_exe_name(executable_name);
+    // find the length of each line
     size_t len = line_length(file);
-    char line[len + 1];
+    char line[len + 1];  // +1 for the null terminator
     int pos = 0;
     while (fgets(line, sizeof(line), file)){
+        // check the name of the executable, use isdigit() to avoid matching `sol_1` with `sol_10`
         if (strncmp(line, exe_name, strlen(exe_name)) == 0 && !isdigit(line[sizeof(exe_name)])) {
             pos = ftell(file) - strlen(line);
+            if (pos == -1) {
+                fprintf(stderr, "Error occurred at line %d in %s: ftell failed\n", __LINE__, __FILE__);
+                exit(EXIT_FAILURE);
+            }
             break;
         }
     }
+    // goto indicated line and find # of correct and total answers
     if (pos != 0) {
-        fseek(file, pos, SEEK_SET);
+        if (fseek(file, pos, SEEK_SET) == -1) {
+            fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
         fgets(line, sizeof(line), file);
     }
     int correct = 0;
     int total = 0;
     char *token = strstr(line, "(");
     while (token != NULL) {
+        // ALIGNMENT is a constant taken from the write_results_to_file function
         char result[ALIGNMENT + 1];     // +1 for the null terminator
         strncpy(result, token + 1, ALIGNMENT);
-        result[9] = '\0';
+        result[ALIGNMENT] = '\0';
         if (strcmp(result, "  correct") == 0) {
             ++correct;
         }
