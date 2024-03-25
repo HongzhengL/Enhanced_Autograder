@@ -321,53 +321,56 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
     fclose(file);
 }
 
-size_t line_length(FILE *file) {
-    // get the length of the first line
-    char line[BUFSIZ];
-    size_t len = 0;
-    fgets(line, sizeof(line), file);
-    for (len = 0; line[len] != '\n'; ++len);
-    if (fseek(file, 0, SEEK_SET) == -1) {
-        fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);\
-        exit(EXIT_FAILURE);
-    }
-    return len;
-}
-
-// TODO: Implement this function
 double get_score(char *results_file, char *executable_name) {
-    // use fseek to find the position of the executable in the file
     FILE *file = fopen(results_file, "r");
     if (!file) {
-        fprintf(stderr, "Error occurred at line %d in %s: Failed to open file\n", __LINE__, __FILE__);
+        perror("Failed to open file");
         exit(EXIT_FAILURE);
     }
+
     char *exe_name = get_exe_name(executable_name);
-    // find the length of each line
-    size_t len = line_length(file);
-    char line[len + 1];  // +1 for the null terminator
-    int pos = 0;
-    while (fgets(line, sizeof(line), file)){
-        // check the name of the executable, use isdigit() to avoid matching `sol_1` with `sol_10`
-        if (strncmp(line, exe_name, strlen(exe_name)) == 0 && !isdigit(line[sizeof(exe_name)])) {
-            pos = ftell(file) - strlen(line);
-            if (pos == -1) {
-                fprintf(stderr, "Error occurred at line %d in %s: ftell failed\n", __LINE__, __FILE__);
-                exit(EXIT_FAILURE);
-            }
+    size_t exe_name_len = 0;
+    while (exe_name[exe_name_len] != '\0') {    // Find the length of the executable name
+        ++exe_name_len;
+    }
+    char line[BUFSIZ];
+    fgets(line, sizeof(line), file);
+    size_t sol_len = 0, answer_len = 0;
+    while (line[sol_len] != ':') {
+        ++sol_len;
+    }
+    while (line[sol_len + 1 + answer_len] != '\n') {    // +1 to skip the colon
+        ++answer_len;                                  // use it to fseek to the next line
+    }
+    char exe_name_new[sol_len + 1];
+    strncpy(exe_name_new, exe_name, exe_name_len);
+    while (exe_name_len < sol_len) {        // pad the executable name with spaces
+        exe_name_new[exe_name_len] = ' ';   // to match the format of the results file
+        ++exe_name_len;                     // and to avoid matching `sol_1` with `sol_10`
+    }
+    exe_name_new[sol_len] = '\0';       // null terminate the string
+    if (fseek(file, 0, SEEK_SET) == -1) {   // Reset the file pointer
+        fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
+    while (1) {
+        if (feof(file)) {
+            fprintf(stderr, "Error occurred at line %d in %s: Executable not found\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
+        fgets(line, sol_len + 1, file);     // get exe_name for that line, +1 for '\0'
+        line[sol_len] = '\0';
+        
+        if (strcmp(line, exe_name_new) == 0) {  // if matches, break
             break;
         }
-    }
-    // goto indicated line and find # of correct and total answers
-    if (pos != 0) {
-        if (fseek(file, pos, SEEK_SET) == -1) {
+        if (fseek(file, answer_len + 2, SEEK_CUR) == -1) {  // +2 to skip the colon and newline
             fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);
             exit(EXIT_FAILURE);
         }
-        fgets(line, sizeof(line), file);
     }
-    int correct = 0;
-    int total = 0;
+    fgets(line, sizeof(line), file);    // Read the line containing the executable's results
+    int correct = 0, total = 0;
     char *token = strstr(line, "(");
     while (token != NULL) {
         // ALIGNMENT is a constant taken from the write_results_to_file function
