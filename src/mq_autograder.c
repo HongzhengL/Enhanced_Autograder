@@ -50,6 +50,7 @@ void receive_ack_from_workers(int msqid, int num_workers) {
     while (received < num_workers) {
         msgbuf_t msg;
         memset(&msg, 0, sizeof(msgbuf_t));
+        // +1 to mtype to receive ACK from workers, avoid worker receiving "ACK" from other workers
         if (msgrcv(msqid, &msg, sizeof(msg), BROADCAST_MTYPE + 1, 0) == -1) {
             perror("Failed to receive message from worker");
             exit(EXIT_FAILURE);

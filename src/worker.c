@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
     }
 
     // TODO: Send ACK message to mq_autograder after all pairs received (mtype = BROADCAST_MTYPE)
-    msg.mtype = BROADCAST_MTYPE + 1;
+    msg.mtype = BROADCAST_MTYPE + 1;    // +1 to avoid receiving "ACK" from other workers
     snprintf(msg.mtext, MESSAGE_SIZE, "ACK");
     if (msgsnd(msqid, &msg, sizeof(msg), 0) == -1) {
         perror("Failed to send message to autograder");
