@@ -1,0 +1,13 @@
+{
+    "name": "CSCI 4061 Project 2",
+    "child_output_file": "results.txt",
+    "timeout": 180,
+    "tests": [
+        {
+            "name": "Change 4 - message queue",
+            "description": "message queue",
+            "command": "./mq_autograder test_cases/exec 1 2 3",
+            "output_file": "test_cases/output/exec_results.txt"
+        }
+    ]
+}

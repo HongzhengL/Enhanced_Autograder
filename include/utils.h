@@ -17,9 +17,19 @@
 #include <errno.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <ctype.h> // For isdigit()
 
 
 #define TIMEOUT_SECS 10    // Timeout threshold for stuck/infinite loop
+#define MAX_INT_CHARS 10 // Maximum number of characters in an integer
+
+/************************* ONLY FOR MESSAGE QUEUES *************************/
+// Message queue msgtyp for general messages between mq_autograder and worker
+#define BROADCAST_MTYPE 4061  
+
+// Size of message queue message -> max size of executable path sent/received
+#define MESSAGE_SIZE 100
+/************************* ONLY FOR MESSAGE QUEUES *************************/
 
 // Main struct for storing the results of the autograder
 typedef struct {
@@ -32,7 +42,7 @@ typedef struct {
 // Message buffer struct for message queue
 typedef struct {
     long mtype;
-    char mtext[100];
+    char mtext[MESSAGE_SIZE];
 } msgbuf_t;
 
 
@@ -44,9 +54,6 @@ enum {
     STUCK_OR_INFINITE       // Corresponds to case 4 and 5: Stuck, or in an infinite loop
 };
 
-
-// Expects a string of the form "sol_1"
-int get_tag(char *executable_name);
 
 // Helper function to get executable name from path
 // Example: solutions/sol_1 -> sol_1
@@ -68,6 +75,14 @@ int get_batch_size();
 
 // Create the input/<input>.in files for each parameter
 void create_input_files(char **argv_params, int num_parameters);
+
+
+// Setup timer to determine if child processes are stuck
+void start_timer(int seconds, void (*timeout_handler)(int));
+
+
+// Cancel the timer
+void cancel_timer();
 
 
 // Unlink all of the input/<input>.in files

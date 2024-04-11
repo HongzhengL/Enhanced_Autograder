@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/types.h>
 
 
 
@@ -12,41 +13,55 @@ void infinite_loop() {
 int main(int argc, char *argv[]) {
     #ifndef REDIR
         if (argc < 2) {
-            // Usage for  EXEC:  argv[0] <param>    # Input is just param
-            // Usage for  PIPE:  argv[0] <pipefd>   # Input is read end pipe fd
-            // Usage for REDIR:  argv[0]            # No param needed, read from stdin
+            // Usage for   EXEC:  argv[0] <param>    # Input is just param
+            // Usage for   PIPE:  argv[0] <pipefd>   # Input is read end pipe fd
+            // Usage for  REDIR:  argv[0]            # No param needed, read from stdin
+            // Usage for MQUEUE:  argv[0] <param>    # Input is just param
             printf("Usage: %s <parameter | pipefd>\n", argv[0]);
             return 1;
         }
     #endif
 
-    unsigned int seed = 0;
+    int seed = 0;
 
     for (int i = 0; argv[0][i] != '\0'; i++) {
-        seed += (unsigned char)argv[0][i]; 
+        seed += (unsigned char)argv[0][i];
     }
 
     unsigned int param = 0;
 
     // TODO: Get input param from the different sources
     #ifdef EXEC
-        
+        param = atoi(argv[1]);
 
     #elif REDIR
-       
-        
+        scanf("%u", &param);
+
     #elif PIPE
-        
+        int pipefd = atoi(argv[1]);
+        char buffer[BUFSIZ];
+        if (read(pipefd, buffer, BUFSIZ) == -1) {
+            perror("Read failed");
+            exit(EXIT_FAILURE);
+        }
+        param = atoi(buffer);
+        if (close(pipefd) == -1) {
+            perror("close failed");
+            exit(EXIT_FAILURE);
+        }
+
+    #elif MQUEUE
+        param = atoi(argv[1]);
 
     #endif
 
     seed += param;
     srandom(seed);
-  
-    int mode = random() % 5 + 1;
-    pid_t pid = getpid(); 
 
-    sleep(1); 
+    int mode = random() % 5 + 1;
+    pid_t pid = getpid();
+
+    sleep(1);
 
     switch (mode) {
         case 1:
@@ -56,11 +71,12 @@ int main(int argc, char *argv[]) {
             //       Do not open the file. Think about what function you can use to output
             //       information given what you redirected in the autograder.c file.
 
+            printf("0");
             break;
         case 2:
             fprintf(stderr, "Program: %s, PID: %d, Mode: 2 - Exiting with status 1 (Incorrect answer)\n", argv[0], pid);
             // TODO: Write the result (1) to the output file (same as case 1 above)
-            
+            printf("1");
             break;
         case 3:
             fprintf(stderr, "Program: %s, PID: %d, Mode: 3 - Triggering a segmentation fault\n", argv[0], pid);

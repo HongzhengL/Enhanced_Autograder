@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#define ALIGNMENT 9     // Number of characters to align the status messages,
+                        // taken from the write_results_to_file function
 
 const char* get_status_message(int status) {
     switch (status) {
@@ -14,15 +16,6 @@ const char* get_status_message(int status) {
 
 char *get_exe_name(char *path) {
     return strrchr(path, '/') + 1;
-}
-
-
-int get_tag(char *executable_name) {
-    unsigned int seed = 0;
-    for (int i = 0; i < strlen(executable_name); i++) {
-        seed += (int)executable_name[i];
-    }
-    return seed;
 }
 
 
@@ -43,13 +36,12 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
     while ((entry = readdir(dir)) != NULL) {
         // Ignore hidden files
         char path[PATH_MAX];
-        sprintf(path, "%s/%s", solution_dir, entry->d_name);
-        
+        snprintf(path, sizeof(path), "%s/%s", solution_dir, entry->d_name);
+
         if (stat(path, &st) == 0) {
             if (S_ISREG(st.st_mode) && entry->d_name[0] != '.')
                 (*num_executables)++;
-        } 
-        else {
+        } else {
             perror("Failed to get file status");
             exit(EXIT_FAILURE);
         }
@@ -57,6 +49,10 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
     // Allocate memory for the array of strings
     char **executables = (char **) malloc(*num_executables * sizeof(char *));
+    if (!executables) {
+        perror("Failed to allocate memory");
+        exit(EXIT_FAILURE);
+    }
 
     // Reset the directory stream
     rewinddir(dir);
@@ -66,12 +62,17 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
     while ((entry = readdir(dir)) != NULL) {
         // Ignore hidden files
         char path[PATH_MAX];
-        sprintf(path, "%s/%s", solution_dir, entry->d_name);
+        snprintf(path, sizeof(path), "%s/%s", solution_dir, entry->d_name);
 
         if (stat(path, &st) == 0) {
             if (S_ISREG(st.st_mode) && entry->d_name[0] != '.') {
-                executables[i] = (char *) malloc((strlen(solution_dir) + strlen(entry->d_name) + 2) * sizeof(char));
-                sprintf(executables[i], "%s/%s", solution_dir, entry->d_name);
+                int len_executable = strlen(solution_dir) + strlen(entry->d_name) + 2;
+                executables[i] = (char *) malloc((len_executable) * sizeof(char));
+                if (!executables[i]) {
+                    perror("Failed to allocate memory");
+                    exit(EXIT_FAILURE);
+                }
+                snprintf(executables[i], len_executable, "%s/%s", solution_dir, entry->d_name);
                 i++;
             }
         }
@@ -87,24 +88,173 @@ char **get_student_executables(char *solution_dir, int *num_executables) {
 
 // TODO: Implement this function
 int get_batch_size() {
-    return 8;
+    int batch_size = 0;
+    int bytes_read;  // bytes_read
+    int pipe_fd[2];  // create a pipe for outputs
+
+    if (pipe(pipe_fd) == -1) {
+        fprintf(stderr, "Error occurred at line %d: pipe failed\n", __LINE__ - 1);
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {  // child process will check the number of processors in /proc/cpuinfo
+        if (close(pipe_fd[0]) == -1) {  // Closing read end, won't need it.
+            fprintf(stderr, "Error occurred at line %d: close failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {  // redirecting stdout to pipe
+            fprintf(stderr, "Error occured at line %d: dup2 failed\n", __LINE__ - 1);
+            exit(EXIT_FAILURE);
+        }
+        execlp("grep", "grep", "-c", "^processor", "/proc/cpuinfo", NULL);
+        fprintf(stderr, "Error occured at line %d: Failed to run execlp", __LINE__ - 1);
+        exit(EXIT_FAILURE);
+    } else if (pid > 0) {  // Parent process
+        if (close(pipe_fd[1]) == -1) {  // close off write
+            perror("Close Failed");
+            exit(EXIT_FAILURE);
+        }
+        char reader[BUFSIZ];
+        if ((bytes_read = read(pipe_fd[0], reader, BUFSIZ)) == -1) {  // read from pipe
+            perror("read failed");
+            exit(EXIT_FAILURE);
+        }
+        reader[bytes_read] = '\0';  // adding string term character to end of batch_size;
+        if (close(pipe_fd[0]) == -1) {  // closing read end of pipe.
+            perror("close failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Safely wait for child process to finish
+        pid_t wait_result;
+        do {
+            wait_result = wait(NULL);
+            if (wait_result == -1 && errno != EINTR) {
+                perror("wait failed");
+                exit(EXIT_FAILURE);
+            }
+        } while (wait_result == -1 && errno == EINTR);
+
+        batch_size = atoi(reader);
+    } else {
+        perror("fork failed");
+        exit(EXIT_FAILURE);
+    }
+    return batch_size;
 }
 
 
 // TODO: Implement this function
 void create_input_files(char **argv_params, int num_parameters) {
-
+    for (int i = 0; i < num_parameters; ++i) {
+        // use snprintf to create the path name of the input file
+        size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
+        char *input_file = (char *) malloc(len_input_file);
+        if (input_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
+        snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
+        FILE *file = fopen(input_file, "w");
+        if (!file) {
+            perror("Failed to open file");
+            exit(EXIT_FAILURE);
+        }
+        // write the parameter to the input file
+        fprintf(file, "%s", argv_params[i]);
+        fclose(file);
+        free(input_file);
+    }
 }
+
+
+// TODO: Implement this function
+void start_timer(int seconds, void (*timeout_handler)(int)) {
+    struct sigaction sa;
+    struct itimerval interval;
+
+    sa.sa_handler = timeout_handler;
+    sa.sa_flags = 0;
+    if (sigemptyset(&sa.sa_mask) == -1) { 
+        perror("Failed to empty sig set");
+        exit(EXIT_FAILURE);
+    }
+    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+        perror("Failed to set up signal handler");
+        exit(1);
+    }
+
+    interval.it_interval.tv_sec = 0;
+    interval.it_interval.tv_usec = 0;
+    interval.it_value.tv_sec = seconds;
+    interval.it_value.tv_usec = 0;
+
+    if (setitimer(ITIMER_REAL, &interval, NULL) == -1) {
+        perror("Failed to set up timer");
+        exit(1);
+    }
+}
+
+
+// TODO: Implement this function
+void cancel_timer() {
+    struct itimerval interval;
+    interval.it_interval.tv_sec = 0;
+    interval.it_interval.tv_usec = 0;
+    interval.it_value.tv_sec = 0;  // Stopping Timer
+    interval.it_value.tv_usec = 0;
+
+    if (setitimer(ITIMER_REAL, &interval, 0)) {
+        perror("setitimer");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 // TODO: Implement this function
 void remove_input_files(char **argv_params, int num_parameters) {
-
+    for (int i = 0; i < num_parameters; ++i) {
+        // use snprintf to create the path name of the input file, then unlink the file
+        size_t len_input_file = strlen("input/") + strlen(argv_params[i]) + strlen(".in") + 1;  // +1 for the null terminator
+        char *input_file = (char *) malloc(len_input_file);  // +1 for the null terminator
+        if (input_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
+        snprintf(input_file, len_input_file, "input/%s.in", argv_params[i]);
+        if (unlink(input_file) == -1) {
+            perror("Failed to unlink file");
+            free(input_file);
+            exit(EXIT_FAILURE);
+        }
+        free(input_file);
+    }
 }
 
 
 // TODO: Implement this function
 void remove_output_files(autograder_results_t *results, int tested, int current_batch_size, char *param) {
+    for (int i = 0; i < current_batch_size; ++i) {
+        // use snprintf to create the path name of the output file, then unlink the file
+        char *exe_name = get_exe_name(results[tested - current_batch_size + i].exe_path);
+        size_t len_output_file = strlen("output/") + strlen(exe_name) + strlen(param) + 2;  // +1 for the null terminator
+        char *output_file = (char *) malloc(len_output_file);
+        if (output_file == NULL) {
+            fprintf(stderr, "Error occurred at line %d: malloc failed\n", __LINE__ - 2);
+            exit(EXIT_FAILURE);
+        }
+        snprintf(output_file, len_output_file, "output/%s.%s", exe_name, param);
 
+        if (unlink(output_file) == -1) {
+            perror("Failed to unlink file");
+            free(output_file);
+            exit(EXIT_FAILURE);
+        }
+
+        free(output_file);
+    }
 }
 
 
@@ -119,7 +269,7 @@ int get_longest_len_executable(autograder_results_t *results, int num_executable
     }
     return longest_len;
 }
- 
+
 
 void write_results_to_file(autograder_results_t *results, int num_executables, int total_params) {
     FILE *file = fopen("results.txt", "w");
@@ -158,12 +308,12 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
         char *exe_name = get_exe_name(results[i].exe_path);
 
         char format[20];
-        sprintf(format, "%%-%ds:", longest_len);
-        fprintf(file, format, exe_name); // Write the program path
+        snprintf(format, sizeof(format), "%%-%ds:", longest_len);
+        fprintf(file, format, exe_name);  // Write the program path
         for (int j = 0; j < total_params; j++) {
-            fprintf(file, "%5d (", results[i].params_tested[j]); // Write the pi value for the program
+            fprintf(file, "%5d (", results[i].params_tested[j]);  // Write the pi value for the program
             const char* message = get_status_message(results[i].status[j]);
-            fprintf(file, "%9s) ", message); // Write each status
+            fprintf(file, "%9s) ", message);  // Write each status
         }
         fprintf(file, "\n");
     }
@@ -171,10 +321,70 @@ void write_results_to_file(autograder_results_t *results, int num_executables, i
     fclose(file);
 }
 
-
-// TODO: Implement this function
 double get_score(char *results_file, char *executable_name) {
-    return 1.0;
+    FILE *file = fopen(results_file, "r");
+    if (!file) {
+        perror("Failed to open file");
+        exit(EXIT_FAILURE);
+    }
+
+    char *exe_name = get_exe_name(executable_name);
+    size_t exe_name_len = 0;
+    while (exe_name[exe_name_len] != '\0') {    // Find the length of the executable name
+        ++exe_name_len;
+    }
+    char line[BUFSIZ];
+    fgets(line, sizeof(line), file);
+    size_t sol_len = 0, answer_len = 0;
+    while (line[sol_len] != ':') {
+        ++sol_len;
+    }
+    while (line[sol_len + 1 + answer_len] != '\n') {    // +1 to skip the colon
+        ++answer_len;                                  // use it to fseek to the next line
+    }
+    char exe_name_new[sol_len + 1];
+    strncpy(exe_name_new, exe_name, exe_name_len);
+    while (exe_name_len < sol_len) {        // pad the executable name with spaces
+        exe_name_new[exe_name_len] = ' ';   // to match the format of the results file
+        ++exe_name_len;                     // and to avoid matching `sol_1` with `sol_10`
+    }
+    exe_name_new[sol_len] = '\0';       // null terminate the string
+    if (fseek(file, 0, SEEK_SET) == -1) {   // Reset the file pointer
+        fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
+    }
+    while (1) {
+        if (feof(file)) {
+            fprintf(stderr, "Error occurred at line %d in %s: Executable not found\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
+        fgets(line, sol_len + 1, file);     // get exe_name for that line, +1 for '\0'
+        line[sol_len] = '\0';
+        
+        if (strcmp(line, exe_name_new) == 0) {  // if matches, break
+            break;
+        }
+        if (fseek(file, answer_len + 2, SEEK_CUR) == -1) {  // +2 to skip the colon and newline
+            fprintf(stderr, "Error occurred at line %d in %s: fseek failed\n", __LINE__, __FILE__);
+            exit(EXIT_FAILURE);
+        }
+    }
+    fgets(line, sizeof(line), file);    // Read the line containing the executable's results
+    int correct = 0, total = 0;
+    char *token = strstr(line, "(");
+    while (token != NULL) {
+        // ALIGNMENT is a constant taken from the write_results_to_file function
+        char result[ALIGNMENT + 1];     // +1 for the null terminator
+        strncpy(result, token + 1, ALIGNMENT);
+        result[ALIGNMENT] = '\0';
+        if (strcmp(result, "  correct") == 0) {
+            ++correct;
+        }
+        ++total;
+        token = strstr(token + 1, "(");
+    }
+    fclose(file);
+    return (double) correct / total * 1.0;
 }
 
 
